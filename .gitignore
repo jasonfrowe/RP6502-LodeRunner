@@ -1,0 +1,5 @@
+loderunner-ng/
+CMakeUserPresets.json
+/build
+/.rp6502
+__pycache__
