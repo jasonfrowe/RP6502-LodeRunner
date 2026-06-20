@@ -8,8 +8,18 @@ find_package(llvm-mos-sdk REQUIRED)
 project(LodeRunner C CXX ASM)
 
 add_executable(LodeRunner)
+
 rp6502_asset(LodeRunner help src/help.txt)
-rp6502_executable(LodeRunner DATA file RESET file)
+# XRAM Assets
+rp6502_asset(LodeRunner 0x10000 images/player_4bpp.bin)
+
+rp6502_executable(LodeRunner 
+    DATA file 
+    RESET file
+)
+
 target_sources(LodeRunner PRIVATE
     src/main.c
+    src/sprite_mode_5.c
+    src/input.c
 )

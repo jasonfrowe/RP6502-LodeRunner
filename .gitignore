@@ -3,3 +3,7 @@ CMakeUserPresets.json
 /build
 /.rp6502
 __pycache__
+/.vscode
+conversion_notes.md
+.venv
+*.aseprite
