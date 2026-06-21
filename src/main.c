@@ -4,6 +4,9 @@
 #include "constants.h"
 #include "sprite_mode_5.h"
 #include "input.h"
+#include "tile_mode_2.h"
+
+static int8_t gplay_tick = 0u;
 
 static bool init_video(void)
 {
@@ -14,9 +17,11 @@ static bool init_video(void)
         return false;
     }
 
-    // tile_mode2_init();
-    // tile_hud_init();
+    // Order matters here.  
     sprite_mode5_players_init();
+    tile_mode2_init();
+    
+    // tile_hud_init();
     // sprite_mode5_init_targets();
     // sprite_mode5_init_projectiles();
     // text_mode1_init();
@@ -24,6 +29,13 @@ static bool init_video(void)
 
     return true;
 }
+
+// static void update_playing_mode(const input_actions_t *actions)
+// {
+//     update_player(actions);
+// }
+
+
 
 static uint8_t s_vsync_last = 0;
 
@@ -48,6 +60,15 @@ int main(void)
         wait_for_vsync();
 
         input_poll(&actions);
+
+        gplay_tick+= FPS;
+
+        if (gplay_tick >= 60) {
+
+            // update_playing_mode(&actions);
+
+            gplay_tick -= 60;
+        }
 
     }
 

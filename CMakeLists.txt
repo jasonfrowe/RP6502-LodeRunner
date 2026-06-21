@@ -12,6 +12,8 @@ add_executable(LodeRunner)
 rp6502_asset(LodeRunner help src/help.txt)
 # XRAM Assets
 rp6502_asset(LodeRunner 0x10000 images/player_4bpp.bin)
+rp6502_asset(LodeRunner 0x11400 images/maptiles_4bpp.bin)
+rp6502_asset(LodeRunner 0x12B80 maps/default.bin)
 
 rp6502_executable(LodeRunner 
     DATA file 
@@ -22,4 +24,5 @@ target_sources(LodeRunner PRIVATE
     src/main.c
     src/sprite_mode_5.c
     src/input.c
+    src/tile_mode_2.c
 )

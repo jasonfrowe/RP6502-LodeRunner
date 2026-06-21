@@ -5,3 +5,10 @@
 ```terminal
 python ./tools/convert_sprite.py --bpp 4 --mode tile --extract-palette graphics/player.png
 ```
+
+## Generating level data
+
+```terminal
+python ./tools/convert_levels.py
+```
+
