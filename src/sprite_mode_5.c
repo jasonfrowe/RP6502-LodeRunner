@@ -51,19 +51,31 @@ void sprite_mode5_players_init(void){
                 player.anim_frame = 0;
                 player.anim_tick = 0;
 
-                player.x_pos_px = col << 4; // Equivalent to col * 16
-                player.y_pos_px = row << 4; // Equivalent to row * 16
-                player.world_x_px = SCREEN_WIDTH_D2 - player.x_pos_px;
-                player.world_y_px = SCREEN_HEIGHT_D2 - player.y_pos_px;
+                int16_t wx = col << 4;
+                int16_t wy = row << 4;
+
+                player.world_x_px = SCREEN_WIDTH_D2 - wx;
+                if (player.world_x_px > 0) {
+                    player.world_x_px = 0;
+                } else if (player.world_x_px < -128) {
+                    player.world_x_px = -128;
+                }
+
+                player.world_y_px = SCREEN_HEIGHT_D2 - wy;
+                if (player.world_y_px > 0) {
+                    player.world_y_px = 0;
+                } else if (player.world_y_px < -16) {
+                    player.world_y_px = -16;
+                }
+
+                player.x_pos_px = wx + player.world_x_px;
+                player.y_pos_px = wy + player.world_y_px;
                 found = true;
                 break;
             }
         }
         if (found) break;
     }
-
-    player.x_pos_px = SCREEN_WIDTH_D2;
-    player.y_pos_px = SCREEN_HEIGHT_D2;
 
     // Set the player config address for updates
     PLAYER_CONFIG = SPRITE_DATA_END; // Just after the player sprite data

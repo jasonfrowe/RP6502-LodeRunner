@@ -46,11 +46,6 @@ static bool can_move_to(int16_t x, int16_t y)
 // Called at 60 Hz to update coordinates, scroll offsets, and apply physics
 void player_update_motion(void)
 {
-    // Define bounds in tilemap space relative to screen center
-    int16_t max_scroll_x = SCREEN_WIDTH_D2;
-    int16_t min_scroll_x = SCREEN_WIDTH_D2 - (WORLD_WIDTH_PX - TILE_SIZE);
-    int16_t max_scroll_y = SCREEN_HEIGHT_D2;
-    int16_t min_scroll_y = SCREEN_HEIGHT_D2 - (WORLD_HEIGHT_PX - TILE_SIZE);
 
     uint8_t current_tile = get_tile(player.grid_x, player.grid_y);
     uint8_t tile_below = get_tile(player.grid_x, player.grid_y + 1);
@@ -236,26 +231,38 @@ void player_update_motion(void)
     int16_t wx = (player.grid_x << 4) + player.offset_x;
     int16_t wy = (player.grid_y << 4) + player.offset_y;
 
-    // Convert to camera scroll positions
-    player.world_x_px = SCREEN_WIDTH_D2 - wx;
-    player.world_y_px = SCREEN_HEIGHT_D2 - wy;
+    // Convert to target camera scroll positions to center the player
+    int16_t target_scroll_x = SCREEN_WIDTH_D2 - wx;
+    int16_t target_scroll_y = SCREEN_HEIGHT_D2 - wy;
 
-    if (player.world_x_px > max_scroll_x) {
-        player.world_x_px = max_scroll_x;
-    } else if (player.world_x_px < min_scroll_x) {
-        player.world_x_px = min_scroll_x;
+    // Clamp the camera scroll offset so the tilemap is always fully on-screen
+    // The screen size is 320x240, and the tilemap is 448x256 pixels.
+    // Scroll range X: [320 - 448, 0] = [-128, 0]
+    // Scroll range Y: [240 - 256, 0] = [-16, 0]
+    player.world_x_px = target_scroll_x;
+    if (player.world_x_px > 0) {
+        player.world_x_px = 0;
+    } else if (player.world_x_px < -128) {
+        player.world_x_px = -128;
     }
 
-    if (player.world_y_px > max_scroll_y) {
-        player.world_y_px = max_scroll_y;
-    } else if (player.world_y_px < min_scroll_y) {
-        player.world_y_px = min_scroll_y;
+    player.world_y_px = target_scroll_y;
+    if (player.world_y_px > 0) {
+        player.world_y_px = 0;
+    } else if (player.world_y_px < -16) {
+        player.world_y_px = -16;
     }
+
+    // Calculate player sprite screen coordinates
+    player.x_pos_px = wx + player.world_x_px;
+    player.y_pos_px = wy + player.world_y_px;
 
     // Synchronize is_falling boolean for backward compatibility
     player.is_falling = (player.state == RSTATE_FALL_LEFT || player.state == RSTATE_FALL_RIGHT);
 
-    // Update XRAM configuration for Mode 2 scroll offset
+    // Update XRAM configurations at 60 Hz
+    xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, x_pos_px, player.x_pos_px);
+    xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, y_pos_px, player.y_pos_px);
     xram0_struct_set(TILE_GROUND_CONFIG, vga_mode2_config_t, x_pos_px, player.world_x_px);
     xram0_struct_set(TILE_GROUND_CONFIG, vga_mode2_config_t, y_pos_px, player.world_y_px);
 }
