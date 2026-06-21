@@ -27,6 +27,8 @@ void sprite_mode5_players_init(void){
     player.offset_x = 0;
     player.offset_y = 0;
     player.state = RSTATE_RIGHT;
+    player.anim_frame = 0;
+    player.anim_tick = 0;
     bool found = false;
 
     RIA.addr0 = TILEMAP_DATA;
@@ -46,6 +48,8 @@ void sprite_mode5_players_init(void){
                 player.offset_x = 0;
                 player.offset_y = 0;
                 player.state = RSTATE_RIGHT;
+                player.anim_frame = 0;
+                player.anim_tick = 0;
 
                 player.x_pos_px = col << 4; // Equivalent to col * 16
                 player.y_pos_px = row << 4; // Equivalent to row * 16

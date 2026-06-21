@@ -263,11 +263,6 @@ void player_update_motion(void)
 // Called at 23 Hz to process inputs and tick core logic
 void player_tick_logic(const input_actions_t *actions)
 {
-    // Ignore input overrides while gravity/falling is active
-    if (player.state == RSTATE_FALL_LEFT || player.state == RSTATE_FALL_RIGHT) {
-        return;
-    }
-
     // 1. Gather current center coordinates for item collection
     int16_t px = (player.grid_x << 4) + player.offset_x;
     int16_t py = (player.grid_y << 4) + player.offset_y;
@@ -279,46 +274,215 @@ void player_tick_logic(const input_actions_t *actions)
         set_tile(center_x, center_y, MAP_TILE_EMPTY); // Erases gold from screen & logic
     }
 
-    // 3. Process controller key transition logic for direction switches
-    const input_actions_t *last = input_last_actions();
+    // 3. Process Digging and Movement Inputs (only if not falling or digging)
+    bool is_falling_state = (player.state == RSTATE_FALL_LEFT || player.state == RSTATE_FALL_RIGHT);
+    bool is_digging_state = (player.state == RSTATE_DIG_LEFT || player.state == RSTATE_DIG_RIGHT);
 
-    bool new_right = actions->right && !last->right;
-    bool new_left = actions->left && !last->left;
-    bool new_down = actions->down && !last->down;
-    bool new_up = actions->up && !last->up;
+    if (!is_falling_state && !is_digging_state) {
+        // Check if we can trigger digging
+        bool on_ground_or_ladder = (!is_empty_tile(get_tile(player.grid_x, player.grid_y + 1)) 
+                                    || get_tile(player.grid_x, player.grid_y) == MAP_TILE_LADDER 
+                                    || get_tile(player.grid_x, player.grid_y) == MAP_TILE_HLADDER);
 
-    if (new_right) {
-        player.dir = DIR_RIGHT;
-    } else if (new_left) {
-        player.dir = DIR_LEFT;
-    } else if (new_down) {
-        player.dir = DIR_DOWN;
-    } else if (new_up) {
-        player.dir = DIR_UP;
-    } else {
-        bool current_held = false;
-        if (player.dir == DIR_RIGHT && actions->right) {
-            current_held = true;
-        } else if (player.dir == DIR_LEFT && actions->left) {
-            current_held = true;
-        } else if (player.dir == DIR_DOWN && actions->down) {
-            current_held = true;
-        } else if (player.dir == DIR_UP && actions->up) {
-            current_held = true;
+        bool did_dig = false;
+        if (on_ground_or_ladder) {
+            if (actions->fire) { // Dig Left
+                if (get_tile(player.grid_x - 1, player.grid_y + 1) == MAP_TILE_BRICK &&
+                    is_empty_tile(get_tile(player.grid_x - 1, player.grid_y))) {
+                    
+                    set_tile(player.grid_x - 1, player.grid_y + 1, MAP_TILE_EMPTY);
+                    player.state = RSTATE_DIG_LEFT;
+                    player.anim_frame = 0;
+                    player.anim_tick = 0;
+                    player.dir = DIR_NONE;
+                    did_dig = true;
+                }
+            }
+            else if (actions->bomb) { // Dig Right
+                if (get_tile(player.grid_x + 1, player.grid_y + 1) == MAP_TILE_BRICK &&
+                    is_empty_tile(get_tile(player.grid_x + 1, player.grid_y))) {
+                    
+                    set_tile(player.grid_x + 1, player.grid_y + 1, MAP_TILE_EMPTY);
+                    player.state = RSTATE_DIG_RIGHT;
+                    player.anim_frame = 0;
+                    player.anim_tick = 0;
+                    player.dir = DIR_NONE;
+                    did_dig = true;
+                }
+            }
         }
 
-        if (!current_held) {
-            if (actions->right) {
+        if (!did_dig) {
+            // Process movement inputs
+            const input_actions_t *last = input_last_actions();
+
+            bool new_right = actions->right && !last->right;
+            bool new_left = actions->left && !last->left;
+            bool new_down = actions->down && !last->down;
+            bool new_up = actions->up && !last->up;
+
+            if (new_right) {
                 player.dir = DIR_RIGHT;
-            } else if (actions->left) {
+            } else if (new_left) {
                 player.dir = DIR_LEFT;
-            } else if (actions->down) {
+            } else if (new_down) {
                 player.dir = DIR_DOWN;
-            } else if (actions->up) {
+            } else if (new_up) {
                 player.dir = DIR_UP;
             } else {
-                player.dir = DIR_NONE;
+                bool current_held = false;
+                if (player.dir == DIR_RIGHT && actions->right) {
+                    current_held = true;
+                } else if (player.dir == DIR_LEFT && actions->left) {
+                    current_held = true;
+                } else if (player.dir == DIR_DOWN && actions->down) {
+                    current_held = true;
+                } else if (player.dir == DIR_UP && actions->up) {
+                    current_held = true;
+                }
+
+                if (!current_held) {
+                    if (actions->right) {
+                        player.dir = DIR_RIGHT;
+                    } else if (actions->left) {
+                        player.dir = DIR_LEFT;
+                    } else if (actions->down) {
+                        player.dir = DIR_DOWN;
+                    } else if (actions->up) {
+                        player.dir = DIR_UP;
+                    } else {
+                        player.dir = DIR_NONE;
+                    }
+                }
             }
         }
     }
+
+    // 4. Update Animations (for all states, including falling and digging)
+    static uint8_t last_state = 0xFF;
+    static uint8_t current_frame_idx = 0;
+
+    // Reset animation if state changed (excluding STOP state which preserves last state's frame)
+    if (player.state != last_state) {
+        if (player.state != RSTATE_STOP) {
+            player.anim_frame = 0;
+            player.anim_tick = 0;
+        }
+        last_state = player.state;
+    }
+
+    uint8_t state = player.state;
+    bool is_animating = (player.dir != DIR_NONE) 
+                        || (player.state == RSTATE_FALL_LEFT || player.state == RSTATE_FALL_RIGHT) 
+                        || (player.state == RSTATE_DIG_LEFT || player.state == RSTATE_DIG_RIGHT);
+
+    if (state != RSTATE_STOP && is_animating) {
+        uint8_t count = 0;
+        uint8_t frame_val = 0;
+        uint8_t duration_val = 0;
+
+        switch (state) {
+            case RSTATE_CLIMB_LEFT:
+                count = 3;
+                if (player.anim_frame == 0) { frame_val = 12; duration_val = 1; }
+                else if (player.anim_frame == 1) { frame_val = 13; duration_val = 2; }
+                else { frame_val = 14; duration_val = 2; }
+                break;
+            case RSTATE_CLIMB_RIGHT:
+                count = 3;
+                if (player.anim_frame == 0) { frame_val = 9; duration_val = 1; }
+                else if (player.anim_frame == 1) { frame_val = 10; duration_val = 2; }
+                else { frame_val = 11; duration_val = 2; }
+                break;
+            case RSTATE_DIG_LEFT:
+                count = 1;
+                frame_val = 16;
+                duration_val = 11;
+                break;
+            case RSTATE_DIG_RIGHT:
+                count = 1;
+                frame_val = 15;
+                duration_val = 11;
+                break;
+            case RSTATE_FALL_LEFT:
+                count = 1;
+                frame_val = 17;
+                duration_val = 1;
+                break;
+            case RSTATE_FALL_RIGHT:
+                count = 1;
+                frame_val = 8;
+                duration_val = 1;
+                break;
+            case RSTATE_LEFT:
+                count = 3;
+                frame_val = 3 + player.anim_frame;
+                duration_val = 1;
+                break;
+            case RSTATE_RIGHT:
+                count = 3;
+                frame_val = 0 + player.anim_frame;
+                duration_val = 1;
+                break;
+            case RSTATE_UPDOWN:
+                count = 2;
+                frame_val = 6 + player.anim_frame;
+                duration_val = 1;
+                break;
+            default:
+                break;
+        }
+
+        if (count > 0) {
+            player.anim_tick++;
+            if (player.anim_tick >= duration_val) {
+                player.anim_tick = 0;
+                player.anim_frame++;
+                if (player.anim_frame >= count) {
+                    if (state == RSTATE_DIG_LEFT) {
+                        player.state = RSTATE_LEFT;
+                        player.anim_frame = 0;
+                        player.anim_tick = 0;
+                        current_frame_idx = 3; // start of left walk
+                    } else if (state == RSTATE_DIG_RIGHT) {
+                        player.state = RSTATE_RIGHT;
+                        player.anim_frame = 0;
+                        player.anim_tick = 0;
+                        current_frame_idx = 0; // start of right walk
+                    } else {
+                        player.anim_frame = 0;
+                    }
+                }
+            }
+            if (player.state == state) {
+                switch (state) {
+                    case RSTATE_CLIMB_LEFT:
+                        if (player.anim_frame == 0) { frame_val = 12; }
+                        else if (player.anim_frame == 1) { frame_val = 13; }
+                        else { frame_val = 14; }
+                        break;
+                    case RSTATE_CLIMB_RIGHT:
+                        if (player.anim_frame == 0) { frame_val = 9; }
+                        else if (player.anim_frame == 1) { frame_val = 10; }
+                        else { frame_val = 11; }
+                        break;
+                    case RSTATE_LEFT:
+                        frame_val = 3 + player.anim_frame;
+                        break;
+                    case RSTATE_RIGHT:
+                        frame_val = 0 + player.anim_frame;
+                        break;
+                    case RSTATE_UPDOWN:
+                        frame_val = 6 + player.anim_frame;
+                        break;
+                    default:
+                        break;
+                }
+                current_frame_idx = frame_val;
+            }
+        }
+    }
+
+    // 5. Update sprite pointer in XRAM
+    xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, xram_sprite_ptr, (PLAYER_DATA + current_frame_idx * PLAYER_FRAME_SIZE));
 }

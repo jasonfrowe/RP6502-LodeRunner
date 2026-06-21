@@ -19,6 +19,8 @@ typedef struct player_s {
     int16_t offset_x;
     int16_t offset_y;
     uint8_t state;
+    uint8_t anim_frame;
+    uint8_t anim_tick;
 } player_t;
 
 extern player_t player;
