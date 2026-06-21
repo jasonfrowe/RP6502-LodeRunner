@@ -25,4 +25,5 @@ target_sources(LodeRunner PRIVATE
     src/sprite_mode_5.c
     src/input.c
     src/tile_mode_2.c
+    src/player.c
 )

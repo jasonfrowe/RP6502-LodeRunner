@@ -8,6 +8,9 @@ typedef struct player_s {
     int16_t y_pos_px;
     int16_t world_x_px;
     int16_t world_y_px;
+    uint8_t dir;
+    uint8_t sub_x;
+    uint8_t sub_y;
 } player_t;
 
 extern player_t player;

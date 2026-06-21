@@ -9,7 +9,6 @@
 
 // Frame rate configuration
 #define FPS 23
-#define FRAME_TIME (1000.0 / FPS)
 
 // Sprite data configuration
 #define SPRITE_DATA_START       0x0000U            // Starting address in XRAM for sprite data
@@ -29,6 +28,8 @@
 #define TILEMAP_DATA_SIZE       0x1C0U             // 448 bytes for tilemap data
 #define TILEMAP_WIDTH           28                 // Width of terrain tileset in pixels
 #define TILEMAP_HEIGHT          16                 // Height of terrain tileset in pixels
+#define WORLD_WIDTH_PX         (TILEMAP_WIDTH * TILE_SIZE)  // Total width of the world in pixels
+#define WORLD_HEIGHT_PX        (TILEMAP_HEIGHT * TILE_SIZE) // Total height of the world in pixels
 
 #define SPRITE_DATA_END        (TILEMAP_DATA + TILEMAP_DATA_SIZE) // End address for sprite data
 
@@ -73,6 +74,5 @@ extern unsigned TILE_GROUND_CONFIG; // Address in XRAM where tile ground config 
 // @ -> 6   MAP_TILE_SOLID
 // - -> 5   MAP_TILE_ROPE
 // X -> 46  MAP_TILE_FALSE
-
 
 #endif // CONSTANTS_H

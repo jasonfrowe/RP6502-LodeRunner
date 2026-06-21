@@ -5,6 +5,7 @@
 #include "sprite_mode_5.h"
 #include "input.h"
 #include "tile_mode_2.h"
+#include "player.h"
 
 static int8_t gplay_tick = 0u;
 
@@ -29,12 +30,6 @@ static bool init_video(void)
 
     return true;
 }
-
-// static void update_playing_mode(const input_actions_t *actions)
-// {
-//     update_player(actions);
-// }
-
 
 
 static uint8_t s_vsync_last = 0;
@@ -61,11 +56,14 @@ int main(void)
 
         input_poll(&actions);
 
-        gplay_tick+= FPS;
+        // Smoothly update movement/camera offsets at 60 Hz VSync
+        player_update_motion();
+
+        gplay_tick += FPS;
 
         if (gplay_tick >= 60) {
-
-            // update_playing_mode(&actions);
+            // Run original 23 Hz logic engine (AI, animations, input actions)
+            player_tick_logic(&actions);
 
             gplay_tick -= 60;
         }

@@ -17,6 +17,9 @@ void sprite_mode5_players_init(void){
     player.y_pos_px = 0;
     player.world_x_px = 0;
     player.world_y_px = 0;
+    player.dir = 0; // DIR_NONE
+    player.sub_x = 0;
+    player.sub_y = 0;
     bool found = false;
 
     RIA.addr0 = TILEMAP_DATA;
