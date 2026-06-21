@@ -11,6 +11,14 @@ typedef struct player_s {
     uint8_t dir;
     uint8_t sub_x;
     uint8_t sub_y;
+    bool is_falling;
+
+    // Grid states and offsets matching loderunner-ng
+    int16_t grid_x;
+    int16_t grid_y;
+    int16_t offset_x;
+    int16_t offset_y;
+    uint8_t state;
 } player_t;
 
 extern player_t player;

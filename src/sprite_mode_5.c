@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include "sprite_mode_5.h"
 #include "constants.h"
+#include "player.h"
 
 // Store the player config address for updates
 unsigned PLAYER_CONFIG;
@@ -20,6 +21,12 @@ void sprite_mode5_players_init(void){
     player.dir = 0; // DIR_NONE
     player.sub_x = 0;
     player.sub_y = 0;
+    player.is_falling = false;
+    player.grid_x = 0;
+    player.grid_y = 0;
+    player.offset_x = 0;
+    player.offset_y = 0;
+    player.state = RSTATE_RIGHT;
     bool found = false;
 
     RIA.addr0 = TILEMAP_DATA;
@@ -29,6 +36,17 @@ void sprite_mode5_players_init(void){
         for (int col = 0; col < TILEMAP_WIDTH; col++) {
             uint8_t tile_id_1 = RIA.rw0;
             if (tile_id_1 == MAP_TILE_RUNNER) {
+                // Seek back to this tile and write empty
+                RIA.addr0 = TILEMAP_DATA + row * TILEMAP_WIDTH + col;
+                RIA.step0 = 0;
+                RIA.rw0 = MAP_TILE_EMPTY;
+
+                player.grid_x = col;
+                player.grid_y = row;
+                player.offset_x = 0;
+                player.offset_y = 0;
+                player.state = RSTATE_RIGHT;
+
                 player.x_pos_px = col << 4; // Equivalent to col * 16
                 player.y_pos_px = row << 4; // Equivalent to row * 16
                 player.world_x_px = SCREEN_WIDTH_D2 - player.x_pos_px;
