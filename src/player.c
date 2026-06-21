@@ -462,7 +462,7 @@ void player_tick_logic(const input_actions_t *actions)
 
     // Check if player has reached the top row on a ladder (Level Win condition)
     if (player.grid_y == 0 && get_tile(player.grid_x, player.grid_y) == MAP_TILE_LADDER) {
-        reload_level();
+        load_next_level();
         return;
     }
 

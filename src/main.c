@@ -19,8 +19,7 @@ static bool init_video(void)
     }
 
     // Order matters here.  
-    sprite_mode5_players_init();
-    tile_mode2_init();
+    load_level(current_level);
     
     // tile_hud_init();
     // sprite_mode5_init_targets();

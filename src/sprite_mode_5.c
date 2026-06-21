@@ -1,6 +1,7 @@
 #include <rp6502.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include "sprite_mode_5.h"
 #include "constants.h"
 #include "player.h"
@@ -12,16 +13,8 @@ unsigned ENEMY_CONFIG;
 
 player_t player;
 
+uint8_t current_level = 1;
 static volatile uint8_t original_map[TILEMAP_WIDTH * TILEMAP_HEIGHT];
-
-void save_original_map(void)
-{
-    RIA.addr0 = TILEMAP_DATA;
-    RIA.step0 = 1;
-    for (int i = 0; i < TILEMAP_WIDTH * TILEMAP_HEIGHT; i++) {
-        original_map[i] = RIA.rw0;
-    }
-}
 
 void reload_level(void)
 {
@@ -37,12 +30,45 @@ void reload_level(void)
     tile_mode2_init();
 }
 
-void sprite_mode5_players_init(void){
-    static bool original_map_saved = false;
-    if (!original_map_saved) {
-        save_original_map();
-        original_map_saved = true;
+void load_level(uint8_t lvl)
+{
+    clear_all_holes();
+    
+    FILE *fp = fopen("ROM:maps", "rb");
+    if (fp) {
+        long offset = (long)(lvl - 1) * (TILEMAP_WIDTH * TILEMAP_HEIGHT);
+        if (fseek(fp, offset, SEEK_SET) == 0) {
+            uint8_t temp_buf[TILEMAP_WIDTH * TILEMAP_HEIGHT];
+            if (fread(temp_buf, 1, TILEMAP_WIDTH * TILEMAP_HEIGHT, fp) == TILEMAP_WIDTH * TILEMAP_HEIGHT) {
+                for (int i = 0; i < TILEMAP_WIDTH * TILEMAP_HEIGHT; i++) {
+                    original_map[i] = temp_buf[i];
+                }
+            }
+        }
+        fclose(fp);
     }
+    
+    // Copy original_map back to XRAM TILEMAP_DATA
+    RIA.addr0 = TILEMAP_DATA;
+    RIA.step0 = 1;
+    for (int i = 0; i < TILEMAP_WIDTH * TILEMAP_HEIGHT; i++) {
+        RIA.rw0 = original_map[i];
+    }
+    
+    sprite_mode5_players_init();
+    tile_mode2_init();
+}
+
+void load_next_level(void)
+{
+    current_level++;
+    if (current_level > 150) {
+        current_level = 1;
+    }
+    load_level(current_level);
+}
+
+void sprite_mode5_players_init(void){
 
     // Find the player start position from the tilemap data
     player.x_pos_px = 0;
