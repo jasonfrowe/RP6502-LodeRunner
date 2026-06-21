@@ -200,7 +200,7 @@ void sprite_mode5_players_init(void){
 
         xram0_struct_set(ptr, vga_mode5_sprite_t, x_pos_px, -32); // Start off-screen
         xram0_struct_set(ptr, vga_mode5_sprite_t, y_pos_px, -32);
-        xram0_struct_set(ptr, vga_mode5_sprite_t, xram_sprite_ptr, PLAYER_DATA);
+        xram0_struct_set(ptr, vga_mode5_sprite_t, xram_sprite_ptr, (PLAYER_DATA + 21 * PLAYER_FRAME_SIZE));
         xram0_struct_set(ptr, vga_mode5_sprite_t, palette_ptr, PLAYER_PALETTE_ADDR);
     }
 

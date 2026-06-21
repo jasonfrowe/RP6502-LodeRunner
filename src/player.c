@@ -18,12 +18,6 @@ void reset_player_input_state(void)
     level_started = false;
     ignore_fire = true;
     ignore_bomb = true;
-
-    // Set initial sprite configurations for guards (frame 21 for GSTATE_LEFT)
-    for (uint8_t i = 0; i < MAX_ENEMIES; i++) {
-        unsigned ptr = ENEMY_CONFIG + (i * sizeof(vga_mode5_sprite_t));
-        xram0_struct_set(ptr, vga_mode5_sprite_t, xram_sprite_ptr, (PLAYER_DATA + 21 * PLAYER_FRAME_SIZE));
-    }
 }
 
 #define MAX_ACTIVE_HOLES 8
