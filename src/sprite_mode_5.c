@@ -4,6 +4,7 @@
 #include "sprite_mode_5.h"
 #include "constants.h"
 #include "player.h"
+#include "tile_mode_2.h"
 
 // Store the player config address for updates
 unsigned PLAYER_CONFIG;
@@ -11,7 +12,37 @@ unsigned ENEMY_CONFIG;
 
 player_t player;
 
+static volatile uint8_t original_map[TILEMAP_WIDTH * TILEMAP_HEIGHT];
+
+void save_original_map(void)
+{
+    RIA.addr0 = TILEMAP_DATA;
+    RIA.step0 = 1;
+    for (int i = 0; i < TILEMAP_WIDTH * TILEMAP_HEIGHT; i++) {
+        original_map[i] = RIA.rw0;
+    }
+}
+
+void reload_level(void)
+{
+    clear_all_holes();
+    
+    RIA.addr0 = TILEMAP_DATA;
+    RIA.step0 = 1;
+    for (int i = 0; i < TILEMAP_WIDTH * TILEMAP_HEIGHT; i++) {
+        RIA.rw0 = original_map[i];
+    }
+    
+    sprite_mode5_players_init();
+    tile_mode2_init();
+}
+
 void sprite_mode5_players_init(void){
+    static bool original_map_saved = false;
+    if (!original_map_saved) {
+        save_original_map();
+        original_map_saved = true;
+    }
 
     // Find the player start position from the tilemap data
     player.x_pos_px = 0;

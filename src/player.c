@@ -98,48 +98,28 @@ void clear_all_holes(void)
     active_holes_count = 0;
 }
 
+
+
 void player_die(void)
 {
-    clear_all_holes();
-    
-    // Reset player position and state
-    player.grid_x = start_grid_x;
-    player.grid_y = start_grid_y;
-    player.offset_x = 0;
-    player.offset_y = 0;
-    player.sub_x = 0;
-    player.sub_y = 0;
-    player.dir = DIR_NONE;
-    player.is_falling = false;
-    player.state = RSTATE_RIGHT;
-    player.anim_frame = 0;
-    player.anim_tick = 0;
-    
-    // Recalculate camera and screen positions
-    int16_t wx = start_grid_x << 4;
-    int16_t wy = start_grid_y << 4;
-    
-    player.world_x_px = SCREEN_WIDTH_D2 - wx;
-    if (player.world_x_px > 0) {
-        player.world_x_px = 0;
-    } else if (player.world_x_px < -128) {
-        player.world_x_px = -128;
+    reload_level();
+}
+
+static void reveal_hidden_ladders(void)
+{
+    RIA.addr0 = TILEMAP_DATA;
+    RIA.step0 = 1;
+    for (int i = 0; i < TILEMAP_WIDTH * TILEMAP_HEIGHT; i++) {
+        uint8_t tile = RIA.rw0;
+        if (tile == MAP_TILE_HLADDER) {
+            RIA.addr0 = TILEMAP_DATA + i;
+            RIA.step0 = 0;
+            RIA.rw0 = MAP_TILE_LADDER;
+            
+            RIA.addr0 = TILEMAP_DATA + i + 1;
+            RIA.step0 = 1;
+        }
     }
-    
-    player.world_y_px = SCREEN_HEIGHT_D2 - wy;
-    if (player.world_y_px > 0) {
-        player.world_y_px = 0;
-    } else if (player.world_y_px < -16) {
-        player.world_y_px = -16;
-    }
-    
-    player.x_pos_px = wx + player.world_x_px;
-    player.y_pos_px = wy + player.world_y_px;
-    
-    // Update XRAM configs
-    xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, x_pos_px, player.x_pos_px);
-    xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, y_pos_px, player.y_pos_px);
-    xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, xram_sprite_ptr, PLAYER_DATA);
 }
 
 static void tick_holes(void)
@@ -464,6 +444,26 @@ void player_tick_logic(const input_actions_t *actions)
     // 2. If center overlaps with gold, collect it
     if (get_tile(center_x, center_y) == MAP_TILE_GOLD) {
         set_tile(center_x, center_y, MAP_TILE_EMPTY); // Erases gold from screen & logic
+        
+        // Check if there is any gold left on the map
+        uint16_t gold_left = 0;
+        RIA.addr0 = TILEMAP_DATA;
+        RIA.step0 = 1;
+        for (int i = 0; i < TILEMAP_WIDTH * TILEMAP_HEIGHT; i++) {
+            if (RIA.rw0 == MAP_TILE_GOLD) {
+                gold_left++;
+            }
+        }
+        
+        if (gold_left == 0) {
+            reveal_hidden_ladders();
+        }
+    }
+
+    // Check if player has reached the top row on a ladder (Level Win condition)
+    if (player.grid_y == 0 && get_tile(player.grid_x, player.grid_y) == MAP_TILE_LADDER) {
+        reload_level();
+        return;
     }
 
     // 3. Process Digging and Movement Inputs (only if not falling or digging)

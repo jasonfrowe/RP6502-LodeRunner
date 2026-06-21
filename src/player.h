@@ -33,5 +33,7 @@ void player_update_motion(void);
 void player_tick_logic(const input_actions_t *actions);
 void player_die(void);
 void clear_all_holes(void);
+void save_original_map(void);
+void reload_level(void);
 
 #endif // PLAYER_H
