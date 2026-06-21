@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include "constants.h"
 #include "tile_mode_2.h"
+#include "sprite_mode_5.h"
 
 unsigned TILE_GROUND_CONFIG;
 
@@ -12,8 +13,8 @@ void tile_mode2_init(void)
 
     xram0_struct_set(TILE_GROUND_CONFIG, vga_mode2_config_t, x_wrap, false);
     xram0_struct_set(TILE_GROUND_CONFIG, vga_mode2_config_t, y_wrap, false);
-    xram0_struct_set(TILE_GROUND_CONFIG, vga_mode2_config_t, x_pos_px, 0);
-    xram0_struct_set(TILE_GROUND_CONFIG, vga_mode2_config_t, y_pos_px, 0);
+    xram0_struct_set(TILE_GROUND_CONFIG, vga_mode2_config_t, x_pos_px, player.world_x_px);
+    xram0_struct_set(TILE_GROUND_CONFIG, vga_mode2_config_t, y_pos_px, player.world_y_px);
     xram0_struct_set(TILE_GROUND_CONFIG, vga_mode2_config_t, width_tiles,  TILEMAP_WIDTH);
     xram0_struct_set(TILE_GROUND_CONFIG, vga_mode2_config_t, height_tiles, TILEMAP_HEIGHT);
     xram0_struct_set(TILE_GROUND_CONFIG, vga_mode2_config_t, xram_data_ptr, TILEMAP_DATA); // tile ID grid

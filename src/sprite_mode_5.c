@@ -1,4 +1,6 @@
 #include <rp6502.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include "sprite_mode_5.h"
 #include "constants.h"
 
@@ -6,12 +8,43 @@
 unsigned PLAYER_CONFIG;
 unsigned ENEMY_CONFIG;
 
+player_t player;
+
 void sprite_mode5_players_init(void){
+
+    // Find the player start position from the tilemap data
+    player.x_pos_px = 0;
+    player.y_pos_px = 0;
+    player.world_x_px = 0;
+    player.world_y_px = 0;
+    bool found = false;
+
+    RIA.addr0 = TILEMAP_DATA;
+    RIA.step0 = 1;
+
+    for (int row = 0; row < TILEMAP_HEIGHT; row++) {
+        for (int col = 0; col < TILEMAP_WIDTH; col++) {
+            uint8_t tile_id_1 = RIA.rw0;
+            if (tile_id_1 == MAP_TILE_RUNNER) {
+                player.x_pos_px = col << 4; // Equivalent to col * 16
+                player.y_pos_px = row << 4; // Equivalent to row * 16
+                player.world_x_px = SCREEN_WIDTH_D2 - player.x_pos_px;
+                player.world_y_px = SCREEN_HEIGHT_D2 - player.y_pos_px;
+                found = true;
+                break;
+            }
+        }
+        if (found) break;
+    }
+
+    player.x_pos_px = SCREEN_WIDTH_D2;
+    player.y_pos_px = SCREEN_HEIGHT_D2;
+
     // Set the player config address for updates
     PLAYER_CONFIG = SPRITE_DATA_END; // Just after the player sprite data
 
-    xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, x_pos_px, 160);
-    xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, y_pos_px, 111);
+    xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, x_pos_px, player.x_pos_px);
+    xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, y_pos_px, player.y_pos_px);
     xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, xram_sprite_ptr, PLAYER_DATA);
     xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, palette_ptr, PLAYER_PALETTE_ADDR);
 

@@ -3,6 +3,15 @@
 
 #include <stdint.h>
 
+typedef struct player_s {
+    int16_t x_pos_px;
+    int16_t y_pos_px;
+    int16_t world_x_px;
+    int16_t world_y_px;
+} player_t;
+
+extern player_t player;
+
 // Palette extracted from graphics/player.png
 static const uint16_t player_4bpp[16] = {
     0x0000,

@@ -4,6 +4,8 @@
 // Screen dimensions
 #define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 240
+#define SCREEN_WIDTH_D2 160
+#define SCREEN_HEIGHT_D2 120
 
 // Frame rate configuration
 #define FPS 23
@@ -21,6 +23,7 @@
 
 #define TILE_DATA              (PLAYER_DATA + PLAYER_DATA_SIZE) // Address for tile bitmap data
 #define TILE_DATA_SIZE          0x1780U            // 6016 bytes 47 x 16x16 tiles at 4bpp)
+#define TILE_SIZE               16                 // Tiles are 16x16 pixels
 
 #define TILEMAP_DATA           (TILE_DATA + TILE_DATA_SIZE) // Address for tilemap data
 #define TILEMAP_DATA_SIZE       0x1C0U             // 448 bytes for tilemap data
@@ -48,5 +51,28 @@
 extern unsigned PLAYER_CONFIG; // Address in XRAM where player sprite config is stored, for updates
 extern unsigned ENEMY_CONFIG;  // Address in XRAM where enemy sprite configs start, for updates
 extern unsigned TILE_GROUND_CONFIG; // Address in XRAM where tile ground config is stored, for updates
+
+// Tile IDs in the tilemap data (maps/default.bin) for reference
+#define MAP_TILE_EMPTY 0
+#define MAP_TILE_BRICK 1
+#define MAP_TILE_GOLD 2
+#define MAP_TILE_HLADDER 43
+#define MAP_TILE_LADDER 4
+#define MAP_TILE_GUARD 44
+#define MAP_TILE_RUNNER 45 // Player start position tile ID  
+#define MAP_TILE_SOLID 6
+#define MAP_TILE_ROPE 5
+#define MAP_TILE_FALSE 46
+
+// # -> 1   MAP_TILE_BRICK 
+// $ -> 2   MAP_TILE_GOLD
+// S -> 43  MAP_TILE_HLADDER
+// H -> 4   MAP_TILE_LADDER
+// 0 -> 44  MAP_TILE_GUARD
+// & -> 45  MAP_TILE_RUNNER
+// @ -> 6   MAP_TILE_SOLID
+// - -> 5   MAP_TILE_ROPE
+// X -> 46  MAP_TILE_FALSE
+
 
 #endif // CONSTANTS_H
