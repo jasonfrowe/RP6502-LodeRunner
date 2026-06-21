@@ -35,9 +35,12 @@ void player_die(void);
 void clear_all_holes(void);
 void save_original_map(void);
 void reload_level(void);
+void reveal_hidden_ladders(void);
 
 extern uint8_t current_level;
+extern bool level_started;
 void load_level(uint8_t lvl);
 void load_next_level(void);
+void reset_player_input_state(void);
 
 #endif // PLAYER_H

@@ -57,6 +57,7 @@ int main(void)
 
         // Smoothly update movement/camera offsets at 60 Hz VSync
         player_update_motion();
+        guards_update_motion();
 
         gplay_tick += FPS;
 

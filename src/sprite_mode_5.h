@@ -2,6 +2,7 @@
 #define SPRITE_MODE5_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef struct player_s {
     int16_t x_pos_px;
@@ -25,6 +26,47 @@ typedef struct player_s {
 
 extern player_t player;
 
+// Guard states
+typedef enum {
+    GSTATE_CLIMB_LEFT,
+    GSTATE_CLIMB_OUT,
+    GSTATE_CLIMB_RIGHT,
+    GSTATE_FALL_LEFT,
+    GSTATE_FALL_RIGHT,
+    GSTATE_LEFT,
+    GSTATE_REBORN,
+    GSTATE_RIGHT,
+    GSTATE_STOP,
+    GSTATE_TRAP_LEFT,
+    GSTATE_TRAP_RIGHT,
+    GSTATE_UPDOWN,
+} guard_state_t;
+
+typedef struct {
+    int16_t x_pos_px;
+    int16_t y_pos_px;
+    int16_t grid_x;
+    int16_t grid_y;
+    int16_t offset_x;
+    int16_t offset_y;
+    uint8_t sub_x;
+    uint8_t sub_y;
+    int16_t start_grid_x;
+    int16_t start_grid_y;
+    uint8_t state;
+    uint8_t anim_frame;
+    uint8_t anim_tick;
+    uint8_t dir;
+    bool hole;
+    int16_t holey;
+    bool gold;
+    int16_t goldholds;
+    bool active;
+} guard_t;
+
+#define MAX_ENEMIES 3
+extern guard_t guards[MAX_ENEMIES];
+
 // Palette extracted from graphics/player.png
 static const uint16_t player_4bpp[16] = {
     0x0000,
@@ -46,5 +88,7 @@ static const uint16_t player_4bpp[16] = {
 };
 
 void sprite_mode5_players_init(void);
+void guards_update_motion(void);
+void guards_tick_logic(void);
 
 #endif // SPRITE_MODE5_H

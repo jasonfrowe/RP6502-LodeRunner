@@ -12,12 +12,14 @@ unsigned PLAYER_CONFIG;
 unsigned ENEMY_CONFIG;
 
 player_t player;
+guard_t guards[MAX_ENEMIES];
 
 uint8_t current_level = 1;
 static volatile uint8_t original_map[TILEMAP_WIDTH * TILEMAP_HEIGHT];
 
 void reload_level(void)
 {
+    reset_player_input_state();
     clear_all_holes();
     
     RIA.addr0 = TILEMAP_DATA;
@@ -32,6 +34,7 @@ void reload_level(void)
 
 void load_level(uint8_t lvl)
 {
+    reset_player_input_state();
     clear_all_holes();
     
     FILE *fp = fopen("ROM:maps", "rb");
@@ -70,7 +73,7 @@ void load_next_level(void)
 
 void sprite_mode5_players_init(void){
 
-    // Find the player start position from the tilemap data
+    // Find the player and guard start positions from the tilemap data
     player.x_pos_px = 0;
     player.y_pos_px = 0;
     player.world_x_px = 0;
@@ -86,7 +89,11 @@ void sprite_mode5_players_init(void){
     player.state = RSTATE_RIGHT;
     player.anim_frame = 0;
     player.anim_tick = 0;
-    bool found = false;
+
+    uint8_t guard_count = 0;
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        guards[i].active = false;
+    }
 
     RIA.addr0 = TILEMAP_DATA;
     RIA.step0 = 1;
@@ -129,11 +136,53 @@ void sprite_mode5_players_init(void){
 
                 player.x_pos_px = wx + player.world_x_px;
                 player.y_pos_px = wy + player.world_y_px;
-                found = true;
-                break;
+
+                // Seek step back to continue scanning
+                RIA.addr0 = TILEMAP_DATA + row * TILEMAP_WIDTH + col + 1;
+                RIA.step0 = 1;
+            }
+            else if (tile_id_1 == MAP_TILE_GUARD) {
+                // Seek back to this tile and write empty
+                RIA.addr0 = TILEMAP_DATA + row * TILEMAP_WIDTH + col;
+                RIA.step0 = 0;
+                RIA.rw0 = MAP_TILE_EMPTY;
+
+                if (guard_count < MAX_ENEMIES) {
+                    guard_t *g = &guards[guard_count];
+                    g->start_grid_x = col;
+                    g->start_grid_y = row;
+                    g->grid_x = col;
+                    g->grid_y = row;
+                    g->offset_x = 0;
+                    g->offset_y = 0;
+                    g->sub_x = 0;
+                    g->sub_y = 0;
+                    g->state = GSTATE_LEFT;
+                    g->anim_frame = 0;
+                    g->anim_tick = 0;
+                    g->dir = 0; // DIR_NONE
+                    g->hole = false;
+                    g->holey = -1;
+                    g->gold = false;
+                    g->goldholds = 0;
+                    g->active = true;
+                    guard_count++;
+                }
+
+                // Seek step back to continue scanning
+                RIA.addr0 = TILEMAP_DATA + row * TILEMAP_WIDTH + col + 1;
+                RIA.step0 = 1;
             }
         }
-        if (found) break;
+    }
+
+    // Align guard positions based on player world scroll offset
+    for (uint8_t i = 0; i < MAX_ENEMIES; i++) {
+        guard_t *g = &guards[i];
+        if (g->active) {
+            g->x_pos_px = (g->grid_x << 4) + player.world_x_px;
+            g->y_pos_px = (g->grid_y << 4) + player.world_y_px;
+        }
     }
 
     // Set the player config address for updates
@@ -167,4 +216,16 @@ void sprite_mode5_players_init(void){
         RIA.rw0 = player_4bpp[i] >> 8;
     } 
 
+    // Check if there is any gold on the map initially
+    uint16_t gold_left = 0;
+    RIA.addr0 = TILEMAP_DATA;
+    RIA.step0 = 1;
+    for (int i = 0; i < TILEMAP_WIDTH * TILEMAP_HEIGHT; i++) {
+        if (RIA.rw0 == MAP_TILE_GOLD) {
+            gold_left++;
+        }
+    }
+    if (gold_left == 0) {
+        reveal_hidden_ladders();
+    }
 }   

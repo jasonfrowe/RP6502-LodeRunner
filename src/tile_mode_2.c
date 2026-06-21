@@ -9,7 +9,7 @@ unsigned TILE_GROUND_CONFIG;
 
 void tile_mode2_init(void)
 {
-    TILE_GROUND_CONFIG = ENEMY_CONFIG + sizeof(vga_mode5_sprite_t); // Just after enemy sprite configs
+    TILE_GROUND_CONFIG = ENEMY_CONFIG + MAX_ENEMIES * sizeof(vga_mode5_sprite_t); // Just after enemy sprite configs
 
     xram0_struct_set(TILE_GROUND_CONFIG, vga_mode2_config_t, x_wrap, false);
     xram0_struct_set(TILE_GROUND_CONFIG, vga_mode2_config_t, y_wrap, false);
