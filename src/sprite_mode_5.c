@@ -45,6 +45,8 @@ void sprite_mode5_players_init(void){
 
                 player.grid_x = col;
                 player.grid_y = row;
+                start_grid_x = col;
+                start_grid_y = row;
                 player.offset_x = 0;
                 player.offset_y = 0;
                 player.state = RSTATE_RIGHT;

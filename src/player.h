@@ -23,10 +23,15 @@
 #define RSTATE_STOP        8
 #define RSTATE_UPDOWN      9
 
+extern int16_t start_grid_x;
+extern int16_t start_grid_y;
+
 // Called at 60 Hz to update the visual scroll positions
 void player_update_motion(void);
 
 // Called at 23 Hz to poll direction and perform logic checks
 void player_tick_logic(const input_actions_t *actions);
+void player_die(void);
+void clear_all_holes(void);
 
 #endif // PLAYER_H

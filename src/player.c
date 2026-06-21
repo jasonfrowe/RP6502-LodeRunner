@@ -5,6 +5,28 @@
 #include "sprite_mode_5.h"
 #include "player.h"
 
+int16_t start_grid_x = 0;
+int16_t start_grid_y = 0;
+
+#define MAX_ACTIVE_HOLES 8
+
+typedef enum {
+    HOLE_STATE_DIGGING,
+    HOLE_STATE_FILLING
+} hole_state_t;
+
+typedef struct {
+    int16_t hx;
+    int16_t hy;
+    bool dig_left;
+    hole_state_t state;
+    int16_t tick;
+    uint8_t original_top_tile;
+} active_hole_t;
+
+static active_hole_t active_holes[MAX_ACTIVE_HOLES];
+static uint8_t active_holes_count = 0;
+
 // Reads tile ID from the tilemap stored in XRAM at grid position (x, y)
 static uint8_t get_tile(int16_t x, int16_t y)
 {
@@ -30,7 +52,165 @@ static void set_tile(int16_t x, int16_t y, uint8_t tile_id)
 // Helper to check if a tile is empty/passable as space
 static bool is_empty_tile(uint8_t tile)
 {
-    return tile == MAP_TILE_EMPTY || tile == MAP_TILE_FALSE || tile == MAP_TILE_GOLD || tile == MAP_TILE_RUNNER || tile == MAP_TILE_GUARD;
+    return tile == MAP_TILE_EMPTY || tile == MAP_TILE_FALSE || tile == MAP_TILE_GOLD || tile == MAP_TILE_RUNNER || tile == MAP_TILE_GUARD || (tile >= 7 && tile <= 42);
+}
+
+static void add_hole(int16_t hx, int16_t hy, bool dig_left)
+{
+    if (active_holes_count >= MAX_ACTIVE_HOLES) {
+        return;
+    }
+    
+    // Check if there is already a hole at this location to prevent duplicate digging
+    for (uint8_t i = 0; i < active_holes_count; i++) {
+        if (active_holes[i].hx == hx && active_holes[i].hy == hy) {
+            return;
+        }
+    }
+    
+    active_hole_t *h = &active_holes[active_holes_count++];
+    h->hx = hx;
+    h->hy = hy;
+    h->dig_left = dig_left;
+    h->state = HOLE_STATE_DIGGING;
+    h->tick = 0;
+    h->original_top_tile = get_tile(hx, hy - 1);
+    
+    // Set initial frame immediately
+    if (dig_left) {
+        set_tile(hx, hy - 1, 7);
+        set_tile(hx, hy, 16);
+    } else {
+        set_tile(hx, hy - 1, 25);
+        set_tile(hx, hy, 34);
+    }
+}
+
+void clear_all_holes(void)
+{
+    for (uint8_t i = 0; i < active_holes_count; i++) {
+        active_hole_t *h = &active_holes[i];
+        if (h->state == HOLE_STATE_DIGGING) {
+            set_tile(h->hx, h->hy - 1, h->original_top_tile);
+        }
+        set_tile(h->hx, h->hy, MAP_TILE_BRICK);
+    }
+    active_holes_count = 0;
+}
+
+void player_die(void)
+{
+    clear_all_holes();
+    
+    // Reset player position and state
+    player.grid_x = start_grid_x;
+    player.grid_y = start_grid_y;
+    player.offset_x = 0;
+    player.offset_y = 0;
+    player.sub_x = 0;
+    player.sub_y = 0;
+    player.dir = DIR_NONE;
+    player.is_falling = false;
+    player.state = RSTATE_RIGHT;
+    player.anim_frame = 0;
+    player.anim_tick = 0;
+    
+    // Recalculate camera and screen positions
+    int16_t wx = start_grid_x << 4;
+    int16_t wy = start_grid_y << 4;
+    
+    player.world_x_px = SCREEN_WIDTH_D2 - wx;
+    if (player.world_x_px > 0) {
+        player.world_x_px = 0;
+    } else if (player.world_x_px < -128) {
+        player.world_x_px = -128;
+    }
+    
+    player.world_y_px = SCREEN_HEIGHT_D2 - wy;
+    if (player.world_y_px > 0) {
+        player.world_y_px = 0;
+    } else if (player.world_y_px < -16) {
+        player.world_y_px = -16;
+    }
+    
+    player.x_pos_px = wx + player.world_x_px;
+    player.y_pos_px = wy + player.world_y_px;
+    
+    // Update XRAM configs
+    xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, x_pos_px, player.x_pos_px);
+    xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, y_pos_px, player.y_pos_px);
+    xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, xram_sprite_ptr, PLAYER_DATA);
+}
+
+static void tick_holes(void)
+{
+    for (int i = 0; i < (int)active_holes_count; ) {
+        active_hole_t *h = &active_holes[i];
+        
+        if (h->state == HOLE_STATE_DIGGING) {
+            h->tick++;
+            if (h->tick >= 11) {
+                // Digging finished, transition to filling
+                h->state = HOLE_STATE_FILLING;
+                h->tick = 0;
+                // Restore top tile to original
+                set_tile(h->hx, h->hy - 1, h->original_top_tile);
+                // Set bottom tile to initial fill frame
+                set_tile(h->hx, h->hy, 33);
+                i++;
+            } else {
+                // Update digging frame in XRAM
+                uint8_t dig_frame = 0;
+                int16_t t = h->tick;
+                if (t < 1) dig_frame = 0;
+                else if (t < 2) dig_frame = 1;
+                else if (t < 4) dig_frame = 2;
+                else if (t < 5) dig_frame = 3;
+                else if (t < 7) dig_frame = 4;
+                else if (t < 8) dig_frame = 5;
+                else if (t < 10) dig_frame = 6;
+                else dig_frame = 7;
+                
+                if (h->dig_left) {
+                    set_tile(h->hx, h->hy - 1, 7 + dig_frame);
+                    set_tile(h->hx, h->hy, 16 + dig_frame);
+                } else {
+                    set_tile(h->hx, h->hy - 1, 25 + dig_frame);
+                    set_tile(h->hx, h->hy, 34 + dig_frame);
+                }
+                i++;
+            }
+        }
+        else if (h->state == HOLE_STATE_FILLING) {
+            h->tick++;
+            if (h->tick >= 186) {
+                // Filling finished, restore brick!
+                set_tile(h->hx, h->hy, MAP_TILE_BRICK);
+                
+                // Check if player is crushed inside this hole
+                if (player.grid_x == h->hx && player.grid_y == h->hy) {
+                    player_die();
+                }
+                
+                // Remove hole from list by swapping with last
+                if (active_holes_count > 0) {
+                    active_holes[i] = active_holes[active_holes_count - 1];
+                    active_holes_count--;
+                }
+            } else {
+                // Update refill frame in XRAM
+                uint8_t fill_tile = 33;
+                int16_t t = h->tick;
+                if (t < 166) fill_tile = 33;
+                else if (t < 174) fill_tile = 24;
+                else if (t < 182) fill_tile = 15;
+                else fill_tile = 42;
+                
+                set_tile(h->hx, h->hy, fill_tile);
+                i++;
+            }
+        }
+    }
 }
 
 // Helper to check if the player can move to a tile
@@ -121,7 +301,6 @@ void player_update_motion(void)
 
             if (next_tx < 0 && !can_move_to(next_grid_x - 1, player.grid_y)) {
                 player.offset_x = 0;
-                player.offset_y = 0;
                 player.state = RSTATE_STOP;
             } else {
                 player.grid_x = next_grid_x;
@@ -146,7 +325,6 @@ void player_update_motion(void)
 
             if (next_tx > 0 && !can_move_to(next_grid_x + 1, player.grid_y)) {
                 player.offset_x = 0;
-                player.offset_y = 0;
                 player.state = RSTATE_STOP;
             } else {
                 player.grid_x = next_grid_x;
@@ -174,7 +352,6 @@ void player_update_motion(void)
 
             if (next_ty < 0 && (!on_ladder || !can_move_to(player.grid_x, next_grid_y - 1))) {
                 player.offset_y = 0;
-                player.offset_x = 0;
                 player.state = RSTATE_STOP;
             } else {
                 player.grid_y = next_grid_y;
@@ -201,7 +378,6 @@ void player_update_motion(void)
             }
             else if (next_ty > 0 && !can_move_to(player.grid_x, next_grid_y + 1)) {
                 player.offset_y = 0;
-                player.offset_x = 0;
                 player.state = RSTATE_STOP;
             }
             else {
@@ -270,6 +446,15 @@ void player_update_motion(void)
 // Called at 23 Hz to process inputs and tick core logic
 void player_tick_logic(const input_actions_t *actions)
 {
+    // 0. Update active holes
+    tick_holes();
+
+    // Check if player is crushed by a brick (only when grid-aligned to avoid false triggers during motion transitions)
+    if (player.offset_x == 0 && player.offset_y == 0 && get_tile(player.grid_x, player.grid_y) == MAP_TILE_BRICK) {
+        player_die();
+        return;
+    }
+
     // 1. Gather current center coordinates for item collection
     int16_t px = (player.grid_x << 4) + player.offset_x;
     int16_t py = (player.grid_y << 4) + player.offset_y;
@@ -297,7 +482,7 @@ void player_tick_logic(const input_actions_t *actions)
                 if (get_tile(player.grid_x - 1, player.grid_y + 1) == MAP_TILE_BRICK &&
                     is_empty_tile(get_tile(player.grid_x - 1, player.grid_y))) {
                     
-                    set_tile(player.grid_x - 1, player.grid_y + 1, MAP_TILE_EMPTY);
+                    add_hole(player.grid_x - 1, player.grid_y + 1, true);
                     player.state = RSTATE_DIG_LEFT;
                     player.anim_frame = 0;
                     player.anim_tick = 0;
@@ -309,7 +494,7 @@ void player_tick_logic(const input_actions_t *actions)
                 if (get_tile(player.grid_x + 1, player.grid_y + 1) == MAP_TILE_BRICK &&
                     is_empty_tile(get_tile(player.grid_x + 1, player.grid_y))) {
                     
-                    set_tile(player.grid_x + 1, player.grid_y + 1, MAP_TILE_EMPTY);
+                    add_hole(player.grid_x + 1, player.grid_y + 1, false);
                     player.state = RSTATE_DIG_RIGHT;
                     player.anim_frame = 0;
                     player.anim_tick = 0;
