@@ -31,13 +31,23 @@
 #define WORLD_WIDTH_PX         (TILEMAP_WIDTH * TILE_SIZE)  // Total width of the world in pixels
 #define WORLD_HEIGHT_PX        (TILEMAP_HEIGHT * TILE_SIZE) // Total height of the world in pixels
 
-#define SPRITE_DATA_END        (TILEMAP_DATA + TILEMAP_DATA_SIZE) // End address for sprite data
+#define TEXT_TILES_DATA        (TILEMAP_DATA + TILEMAP_DATA_SIZE) // Address for text tile bitmap data
+#define TEXT_TILES_DATA_SIZE    0x5F80U           // 24320 bytes (191 frames 16x16 at 4bpp)
+
+#define TEXT_TILES_MAP_DATA     (TEXT_TILES_DATA + TEXT_TILES_DATA_SIZE) // Address for text tilemap data
+#define TEXT_TILES_MAP_DATA_SIZE 0x12CU            // 300 bytes for text
+#define TEXT_TILES_WIDTH         20                // 320/16 = 20 tiles per row for text layer  
+#define TEXT_TILES_HEIGHT        15                // 240/16 = 15 tiles per column for text layer
+
+#define SPRITE_DATA_END        (TEXT_TILES_MAP_DATA + TEXT_TILES_MAP_DATA_SIZE) // End address for sprite data
 
 // Palette configurations
 #define PLAYER_PALETTE_ADDR      0xFC00  // 16-color palette (32 bytes, 0xFC00-0xFC1F)
 #define PLAYER_PALETTE_SIZE      0x0020  // 32 bytes for 16 colors at 2 bytes each
 #define TILE_PALETTE_ADDR        0xFC20  // 16-color palette for tiles (32 bytes, 0xFC20-0xFC3F)
 #define TILE_PALETTE_SIZE        0x0020  // 32 bytes for 16 colors at 2 bytes each
+#define TEXT_PALETTE_ADDR        0xFC40  // 16-color palette for text tiles (32 bytes, 0xFC40-0xFC5F)
+#define TEXT_PALETTE_SIZE        0x0020  // 32 bytes for 16 colors at 2 bytes each
 
 
 // OPL2 sound chip configuration
@@ -52,6 +62,7 @@
 extern unsigned PLAYER_CONFIG; // Address in XRAM where player sprite config is stored, for updates
 extern unsigned ENEMY_CONFIG;  // Address in XRAM where enemy sprite configs start, for updates
 extern unsigned TILE_GROUND_CONFIG; // Address in XRAM where tile ground config is stored, for updates
+extern unsigned TEXT_CONFIG; // Address in XRAM where text tile config is stored, for updates
 
 // Tile IDs in the tilemap data (maps/default.bin) for reference
 #define MAP_TILE_EMPTY 0

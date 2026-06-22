@@ -39,8 +39,13 @@ void reveal_hidden_ladders(void);
 
 extern uint8_t current_level;
 extern bool level_started;
+extern bool game_paused;
+extern bool game_over;
+extern uint32_t player_score;
+extern uint8_t player_lives;
 void load_level(uint8_t lvl);
 void load_next_level(void);
 void reset_player_input_state(void);
+void update_hud(void);
 
 #endif // PLAYER_H

@@ -64,6 +64,11 @@ void load_level(uint8_t lvl)
 
 void load_next_level(void)
 {
+    if (player_lives < 99) {
+        player_lives++;
+    }
+    player_score += 1500;
+
     current_level++;
     if (current_level > 150) {
         current_level = 1;
@@ -127,11 +132,11 @@ void sprite_mode5_players_init(void){
                     player.world_x_px = -128;
                 }
 
-                player.world_y_px = SCREEN_HEIGHT_D2 - wy;
+                player.world_y_px = 112 - wy;
                 if (player.world_y_px > 0) {
                     player.world_y_px = 0;
-                } else if (player.world_y_px < -16) {
-                    player.world_y_px = -16;
+                } else if (player.world_y_px < -32) {
+                    player.world_y_px = -32;
                 }
 
                 player.x_pos_px = wx + player.world_x_px;
@@ -205,7 +210,7 @@ void sprite_mode5_players_init(void){
     }
 
     // Mode 5 args: MODE, OPTIONS, CONFIG, LENGTH, PLANE, BEGIN, END
-    if (xreg_vga_mode(5, 0x0A, PLAYER_CONFIG, 1 + MAX_ENEMIES, 2, 0, 0) < 0) {
+    if (xreg_vga_mode(5, 0x0A, PLAYER_CONFIG, 1 + MAX_ENEMIES, 1, 0, 224) < 0) {
         return;
     }
 

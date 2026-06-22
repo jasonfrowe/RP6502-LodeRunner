@@ -10,14 +10,22 @@ int16_t start_grid_x = 0;
 int16_t start_grid_y = 0;
 
 bool level_started = false;
+bool game_paused = false;
+bool game_over = false;
+uint32_t player_score = 0;
+uint8_t player_lives = 5;
 static bool ignore_fire = false;
 static bool ignore_bomb = false;
+static bool wait_for_input_release = true;
+static bool game_over_waiting_release = true;
 
 void reset_player_input_state(void)
 {
     level_started = false;
     ignore_fire = true;
     ignore_bomb = true;
+    wait_for_input_release = true;
+    game_paused = false;
 }
 
 #define MAX_ACTIVE_HOLES 8
@@ -120,7 +128,28 @@ void clear_all_holes(void)
 
 void player_die(void)
 {
-    reload_level();
+    if (player_lives > 0) {
+        player_lives--;
+    }
+    update_hud(); // Sync final 0 lives display
+    if (player_lives == 0) {
+        game_over = true;
+        game_over_waiting_release = true;
+        // Display "GAME OVER" in the middle of text layer
+        RIA.addr0 = TEXT_TILES_MAP_DATA + 145;
+        RIA.step0 = 1;
+        RIA.rw0 = 17; // G
+        RIA.rw0 = 11; // A
+        RIA.rw0 = 23; // M
+        RIA.rw0 = 15; // E
+        RIA.rw0 = 0;  // Space
+        RIA.rw0 = 25; // O
+        RIA.rw0 = 32; // V
+        RIA.rw0 = 15; // E
+        RIA.rw0 = 28; // R
+    } else {
+        reload_level();
+    }
 }
 
 void reveal_hidden_ladders(void)
@@ -191,11 +220,17 @@ static void tick_holes(void)
                 }
 
                 // Check if any guard is crushed inside this hole
+                bool guard_crushed = false;
                 for (uint8_t g_idx = 0; g_idx < MAX_ENEMIES; g_idx++) {
                     guard_t *g = &guards[g_idx];
                     if (g->active && g->grid_x == h->hx && g->grid_y == h->hy) {
                         ai_reborn(g_idx);
+                        player_score += 75;
+                        guard_crushed = true;
                     }
+                }
+                if (guard_crushed) {
+                    update_hud();
                 }
                 
                 // Remove hole from list by swapping with last
@@ -232,6 +267,7 @@ static bool can_move_to(int16_t x, int16_t y)
 // Called at 60 Hz to update coordinates, scroll offsets, and apply physics
 void player_update_motion(void)
 {
+    if (game_paused || game_over) return;
     if (!level_started) return;
 
     uint8_t current_tile = get_tile(player.grid_x, player.grid_y);
@@ -416,12 +452,12 @@ void player_update_motion(void)
 
     // Convert to target camera scroll positions to center the player
     int16_t target_scroll_x = SCREEN_WIDTH_D2 - wx;
-    int16_t target_scroll_y = SCREEN_HEIGHT_D2 - wy;
+    int16_t target_scroll_y = 112 - wy;
 
     // Clamp the camera scroll offset so the tilemap is always fully on-screen
     // The screen size is 320x240, and the tilemap is 448x256 pixels.
     // Scroll range X: [320 - 448, 0] = [-128, 0]
-    // Scroll range Y: [240 - 256, 0] = [-16, 0]
+    // Scroll range Y: [224 - 256, 0] = [-32, 0] (leaving bottom 16 pixels for HUD)
     player.world_x_px = target_scroll_x;
     if (player.world_x_px > 0) {
         player.world_x_px = 0;
@@ -432,8 +468,8 @@ void player_update_motion(void)
     player.world_y_px = target_scroll_y;
     if (player.world_y_px > 0) {
         player.world_y_px = 0;
-    } else if (player.world_y_px < -16) {
-        player.world_y_px = -16;
+    } else if (player.world_y_px < -32) {
+        player.world_y_px = -32;
     }
 
     // Calculate player sprite screen coordinates
@@ -459,6 +495,78 @@ void player_update_motion(void)
 // Called at 23 Hz to process inputs and tick core logic
 void player_tick_logic(const input_actions_t *actions)
 {
+    // 1. Handle Game Over state
+    if (game_over) {
+        bool button_pressed = (actions->left || actions->right || actions->up || actions->down || 
+                               actions->fire || actions->bomb || actions->start);
+        if (game_over_waiting_release) {
+            if (!button_pressed) {
+                game_over_waiting_release = false;
+            }
+            return;
+        }
+        
+        if (button_pressed) {
+            // Clear "GAME OVER" text
+            RIA.addr0 = TEXT_TILES_MAP_DATA + 145;
+            RIA.step0 = 1;
+            for (int i = 0; i < 9; i++) {
+                RIA.rw0 = 0;
+            }
+            
+            player_score = 0;
+            player_lives = 5;
+            current_level = 1;
+            game_over = false;
+            load_level(1);
+        }
+        return;
+    }
+
+    // 2. Handle Pause input and state
+    static bool start_was_pressed = false;
+    bool start_pressed = actions->start;
+    bool start_triggered = start_pressed && !start_was_pressed;
+    start_was_pressed = start_pressed;
+
+    if (start_triggered) {
+        if (game_paused) {
+            game_paused = false;
+            // Clear "PAUSED" text from the screen
+            RIA.addr0 = TEXT_TILES_MAP_DATA + 147;
+            RIA.step0 = 1;
+            for (int i = 0; i < 6; i++) {
+                RIA.rw0 = 0;
+            }
+        } else {
+            game_paused = true;
+            // Draw "PAUSED"
+            RIA.addr0 = TEXT_TILES_MAP_DATA + 147;
+            RIA.step0 = 1;
+            RIA.rw0 = 26; // P
+            RIA.rw0 = 11; // A
+            RIA.rw0 = 31; // U
+            RIA.rw0 = 29; // S
+            RIA.rw0 = 15; // E
+            RIA.rw0 = 14; // D
+        }
+    }
+
+    if (game_paused) {
+        return;
+    }
+
+    // 3. Handle waiting for input release after respawn/load
+    if (wait_for_input_release) {
+        bool button_pressed = (actions->left || actions->right || actions->up || actions->down || 
+                               actions->fire || actions->bomb);
+        if (!button_pressed) {
+            wait_for_input_release = false;
+        }
+        return;
+    }
+
+    // 4. Handle starting the level
     if (!level_started) {
         if (actions->left || actions->right || actions->up || actions->down || actions->fire || actions->bomb) {
             level_started = true;
@@ -488,6 +596,8 @@ void player_tick_logic(const input_actions_t *actions)
     // 2. If center overlaps with gold, collect it
     if (get_tile(center_x, center_y) == MAP_TILE_GOLD) {
         set_tile(center_x, center_y, MAP_TILE_EMPTY); // Erases gold from screen & logic
+        player_score += 250;
+        update_hud();
         
         // Check if there is any gold left on the map or held by guards
         uint16_t gold_left = 0;
@@ -1317,6 +1427,7 @@ static bool is_guard_trapped_at(int16_t x, int16_t y)
 
 void guards_update_motion(void)
 {
+    if (game_paused || game_over) return;
     if (!level_started) {
         for (uint8_t i = 0; i < MAX_ENEMIES; i++) {
             guard_t *g = &guards[i];
@@ -1397,6 +1508,8 @@ void guards_update_motion(void)
                     g->anim_frame = 0;
                     g->anim_tick = 0;
                     g->dir = DIR_NONE;
+                    player_score += 75;
+                    update_hud();
                 }
             }
 
@@ -1650,5 +1763,63 @@ void guards_tick_logic(void)
         }
 
         update_guard_animation(i);
+    }
+}
+
+void update_hud(void)
+{
+    uint32_t score = player_score;
+    uint8_t d5, d4, d3, d2, d1, d0;
+    
+    if (score > 999999) {
+        score = 999999;
+    }
+    
+    d5 = score / 100000;
+    score %= 100000;
+    d4 = score / 10000;
+    score %= 10000;
+    d3 = score / 1000;
+    score %= 1000;
+    d2 = score / 100;
+    score %= 100;
+    d1 = score / 10;
+    d0 = score % 10;
+    
+    RIA.addr0 = TEXT_TILES_MAP_DATA + 280;
+    RIA.step0 = 1;
+    RIA.rw0 = d5 + 1;
+    RIA.rw0 = d4 + 1;
+    RIA.rw0 = d3 + 1;
+    RIA.rw0 = d2 + 1;
+    RIA.rw0 = d1 + 1;
+    RIA.rw0 = d0 + 1;
+    
+    {
+        uint8_t lives = player_lives;
+        uint8_t l2, l1, l0;
+        l2 = lives / 100;
+        l1 = (lives % 100) / 10;
+        l0 = lives % 10;
+        
+        RIA.addr0 = TEXT_TILES_MAP_DATA + 290;
+        RIA.step0 = 1;
+        RIA.rw0 = l2 + 1;
+        RIA.rw0 = l1 + 1;
+        RIA.rw0 = l0 + 1;
+    }
+    
+    {
+        uint8_t lvl = current_level;
+        uint8_t lv2, lv1, lv0;
+        lv2 = lvl / 100;
+        lv1 = (lvl % 100) / 10;
+        lv0 = lvl % 10;
+        
+        RIA.addr0 = TEXT_TILES_MAP_DATA + 297;
+        RIA.step0 = 1;
+        RIA.rw0 = lv2 + 1;
+        RIA.rw0 = lv1 + 1;
+        RIA.rw0 = lv0 + 1;
     }
 }
