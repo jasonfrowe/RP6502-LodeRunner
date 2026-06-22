@@ -12,13 +12,19 @@
 enum {
     KEY_B = 0x05,
     KEY_H = 0x0B,
+    KEY_P = 0x13,
     KEY_X = 0x1B,
     KEY_Z = 0x1D,
     KEY_ENTER = 0x28,
+    KEY_ESC = 0x29,
     KEY_SPACE = 0x2C,
     KEY_COMMA = 0x36,
     KEY_PERIOD = 0x37,
-    KEY_SLASH = 0x38
+    KEY_SLASH = 0x38,
+    KEY_RIGHT = 0x4F,
+    KEY_LEFT = 0x50,
+    KEY_DOWN = 0x51,
+    KEY_UP = 0x52
 };
 
 enum {
@@ -124,25 +130,25 @@ static void reset_default_mappings(void)
 {
     memset(s_button_mappings, 0, sizeof(s_button_mappings));
 
-    s_button_mappings[ACTION_MOVE_UP].keyboard_key = KEY_SLASH;
+    s_button_mappings[ACTION_MOVE_UP].keyboard_key = KEY_UP;
     s_button_mappings[ACTION_MOVE_UP].gamepad_button = GP_FIELD_STICKS;
     s_button_mappings[ACTION_MOVE_UP].gamepad_mask = GP_LSTICK_UP;
     s_button_mappings[ACTION_MOVE_UP].gamepad_button2 = GP_FIELD_DPAD;
     s_button_mappings[ACTION_MOVE_UP].gamepad_mask2 = GP_DPAD_UP;
 
-    s_button_mappings[ACTION_MOVE_DOWN].keyboard_key = KEY_COMMA;
+    s_button_mappings[ACTION_MOVE_DOWN].keyboard_key = KEY_DOWN;
     s_button_mappings[ACTION_MOVE_DOWN].gamepad_button = GP_FIELD_STICKS;
     s_button_mappings[ACTION_MOVE_DOWN].gamepad_mask = GP_LSTICK_DOWN;
     s_button_mappings[ACTION_MOVE_DOWN].gamepad_button2 = GP_FIELD_DPAD;
     s_button_mappings[ACTION_MOVE_DOWN].gamepad_mask2 = GP_DPAD_DOWN;
 
-    s_button_mappings[ACTION_MOVE_LEFT].keyboard_key = KEY_X;
+    s_button_mappings[ACTION_MOVE_LEFT].keyboard_key = KEY_LEFT;
     s_button_mappings[ACTION_MOVE_LEFT].gamepad_button = GP_FIELD_STICKS;
     s_button_mappings[ACTION_MOVE_LEFT].gamepad_mask = GP_LSTICK_LEFT;
     s_button_mappings[ACTION_MOVE_LEFT].gamepad_button2 = GP_FIELD_DPAD;
     s_button_mappings[ACTION_MOVE_LEFT].gamepad_mask2 = GP_DPAD_LEFT;
 
-    s_button_mappings[ACTION_MOVE_RIGHT].keyboard_key = KEY_Z;
+    s_button_mappings[ACTION_MOVE_RIGHT].keyboard_key = KEY_RIGHT;
     s_button_mappings[ACTION_MOVE_RIGHT].gamepad_button = GP_FIELD_STICKS;
     s_button_mappings[ACTION_MOVE_RIGHT].gamepad_mask = GP_LSTICK_RIGHT;
     s_button_mappings[ACTION_MOVE_RIGHT].gamepad_button2 = GP_FIELD_DPAD;
@@ -152,11 +158,11 @@ static void reset_default_mappings(void)
     s_button_mappings[ACTION_BTN_Y].gamepad_button = GP_FIELD_BTN0;
     s_button_mappings[ACTION_BTN_Y].gamepad_mask = GP_BTN_Y;
 
-    s_button_mappings[ACTION_BTN_A].keyboard_key = KEY_B;
+    s_button_mappings[ACTION_BTN_A].keyboard_key = KEY_X;
     s_button_mappings[ACTION_BTN_A].gamepad_button = GP_FIELD_BTN0;
     s_button_mappings[ACTION_BTN_A].gamepad_mask = GP_BTN_A;
 
-    s_button_mappings[ACTION_BTN_X].keyboard_key = KEY_SPACE;
+    s_button_mappings[ACTION_BTN_X].keyboard_key = KEY_Z;
     s_button_mappings[ACTION_BTN_X].gamepad_button = GP_FIELD_BTN0;
     s_button_mappings[ACTION_BTN_X].gamepad_mask = GP_BTN_X;
 
@@ -168,7 +174,7 @@ static void reset_default_mappings(void)
     s_button_mappings[ACTION_BTN_SELECT].gamepad_button = GP_FIELD_BTN1;
     s_button_mappings[ACTION_BTN_SELECT].gamepad_mask = GP_BTN_SELECT;
 
-    s_button_mappings[ACTION_BTN_START].keyboard_key = KEY_ENTER;
+    s_button_mappings[ACTION_BTN_START].keyboard_key = KEY_P;
     s_button_mappings[ACTION_BTN_START].gamepad_button = GP_FIELD_BTN1;
     s_button_mappings[ACTION_BTN_START].gamepad_mask = GP_BTN_START;
 }
@@ -217,6 +223,12 @@ static bool action_pressed(uint8_t action_id)
 
     if (key_is_down(mapping->keyboard_key)) {
         return true;
+    }
+
+    if (action_id == ACTION_BTN_START) {
+        if (key_is_down(KEY_P) || key_is_down(KEY_ESC) || key_is_down(KEY_ENTER)) {
+            return true;
+        }
     }
 
     if (!gamepad_connected()) {
