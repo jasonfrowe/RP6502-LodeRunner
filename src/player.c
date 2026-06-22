@@ -686,6 +686,7 @@ void player_tick_logic(const input_actions_t *actions)
         
         if (gold_left == 0) {
             reveal_hidden_ladders();
+            sound_play_hladder();
         }
     }
 

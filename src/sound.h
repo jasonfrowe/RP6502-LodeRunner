@@ -15,7 +15,8 @@ void sound_play_dig(void);          // Channel 5: Dig sweep
 void sound_play_fall(bool enable);   // Channel 6: Fall siren (continuous loop when active)
 void sound_play_trap(void);         // Channel 7: Guard trapped alert
 void sound_play_gold(void);         // Channel 8: Gold pickup arpeggio (priority 1)
-void sound_play_death(void);        // Channel 8: Death arpeggio (priority 2)
-void sound_play_win(void);          // Channel 8: Level clear fanfare (priority 3)
+void sound_play_hladder(void);      // Channel 8: All gold collected chime (priority 2)
+void sound_play_death(void);        // Channel 8: Death arpeggio (priority 3)
+void sound_play_win(void);          // Channel 8: Level clear fanfare (priority 4)
 
 #endif // SOUND_H

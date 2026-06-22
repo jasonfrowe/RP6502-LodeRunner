@@ -19,6 +19,13 @@ static const OPL_Patch gold_patch = {
     .feedback=0x02,
 };
 
+// Hidden ladder revealed: sparkling metallic FM chime
+static const OPL_Patch hladder_patch = {
+    .m_ave=0x22, .m_ksl=0x00, .m_atdec=0xF8, .m_susrel=0x0A, .m_wave=0x00,
+    .c_ave=0x21, .c_ksl=0x00, .c_atdec=0xF6, .c_susrel=0x08, .c_wave=0x00,
+    .feedback=0x06,
+};
+
 // Digging blaster: descending sweep
 static const OPL_Patch dig_patch = {
     .m_ave=0x61, .m_ksl=0x11, .m_atdec=0xF9, .m_susrel=0x0F, .m_wave=0x01,
@@ -87,6 +94,10 @@ static uint8_t trap_tick;
 #define GOLD_NOTE_TICKS 4u
 static const uint8_t gold_notes[GOLD_NOTES] = { 72, 79 };
 
+#define HLADDER_NOTES 7u
+#define HLADDER_NOTE_TICKS 4u
+static const uint8_t hladder_notes[HLADDER_NOTES] = { 72, 74, 76, 78, 80, 82, 84 };
+
 #define DEATH_NOTES 6u
 #define DEATH_NOTE_TICKS 6u
 static const uint8_t death_notes[DEATH_NOTES] = { 48, 45, 42, 39, 36, 33 };
@@ -96,7 +107,7 @@ static const uint8_t death_notes[DEATH_NOTES] = { 48, 45, 42, 39, 36, 33 };
 static const uint8_t win_notes[WIN_NOTES] = { 60, 64, 67, 72, 76, 79, 84 };
 
 static bool            player_sfx_active;
-static uint8_t         player_sfx_prio; // 0=none, 1=gold, 2=death, 3=win
+static uint8_t         player_sfx_prio; // 0=none, 1=gold, 2=hladder, 3=death, 4=win
 static uint8_t         player_sfx_note_idx;
 static uint8_t         player_sfx_tick;
 static uint8_t         player_sfx_total_notes;
@@ -210,16 +221,22 @@ void sound_play_gold(void)
     start_player_sfx(1, &gold_patch, gold_notes, GOLD_NOTES, GOLD_NOTE_TICKS, 127);
 }
 
-void sound_play_death(void)
+void sound_play_hladder(void)
 {
     if (player_sfx_active && player_sfx_prio >= 2u) return;
-    start_player_sfx(2, &death_patch, death_notes, DEATH_NOTES, DEATH_NOTE_TICKS, 127);
+    start_player_sfx(2, &hladder_patch, hladder_notes, HLADDER_NOTES, HLADDER_NOTE_TICKS, 127);
+}
+
+void sound_play_death(void)
+{
+    if (player_sfx_active && player_sfx_prio >= 3u) return;
+    start_player_sfx(3, &death_patch, death_notes, DEATH_NOTES, DEATH_NOTE_TICKS, 127);
 }
 
 void sound_play_win(void)
 {
-    if (player_sfx_active && player_sfx_prio >= 3u) return;
-    start_player_sfx(3, &win_patch, win_notes, WIN_NOTES, WIN_NOTE_TICKS, 127);
+    if (player_sfx_active && player_sfx_prio >= 4u) return;
+    start_player_sfx(4, &win_patch, win_notes, WIN_NOTES, WIN_NOTE_TICKS, 127);
 }
 
 void sound_update(void)
