@@ -19,6 +19,9 @@ rp6502_asset(LodeRunner 0x12D40 images/texttiles_4bpp.bin)
 # Pack concatenated level maps to ROM
 rp6502_asset(LodeRunner maps maps/maps.bin)
 
+# Music assets
+rp6502_asset(LodeRunner loderun Music/LODERUN.BIN)
+
 rp6502_executable(LodeRunner 
     DATA file 
     RESET file
@@ -30,4 +33,6 @@ target_sources(LodeRunner PRIVATE
     src/input.c
     src/tile_mode_2.c
     src/player.c
+    src/opl.c
+    src/sound.c
 )

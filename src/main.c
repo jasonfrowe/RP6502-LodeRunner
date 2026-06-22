@@ -6,6 +6,8 @@
 #include "input.h"
 #include "tile_mode_2.h"
 #include "player.h"
+#include "opl.h"
+#include "sound.h"
 
 static int8_t gplay_tick = 0u;
 
@@ -46,6 +48,11 @@ int main(void)
 
     input_init();
 
+    OPL_Config(1, OPL_ADDR);
+    opl_init();
+    sound_init();
+    music_init("ROM:loderun");
+
     if (!init_video()) {
         return 1;
     }
@@ -58,6 +65,9 @@ int main(void)
         // Smoothly update movement/camera offsets at 60 Hz VSync
         player_update_motion();
         guards_update_motion();
+
+        update_music();
+        sound_update();
 
         gplay_tick += FPS;
 

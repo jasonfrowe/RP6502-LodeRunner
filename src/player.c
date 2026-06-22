@@ -5,6 +5,8 @@
 #include "constants.h"
 #include "sprite_mode_5.h"
 #include "player.h"
+#include "opl.h"
+#include "sound.h"
 
 int16_t start_grid_x = 0;
 int16_t start_grid_y = 0;
@@ -141,6 +143,7 @@ void player_die(void)
     }
     update_hud(); // Sync lives display immediately
     death_delay_counter = 35; // Start transition delay (~1.5 seconds)
+    sound_play_death();
 }
 
 void reveal_hidden_ladders(void)
@@ -264,16 +267,24 @@ void player_update_motion(void)
         int16_t y_val = (death_delay_counter % 8 < 4) ? -32 : player.y_pos_px;
         xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, x_pos_px, x_val);
         xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, y_pos_px, y_val);
+        sound_play_fall(false);
         return;
     }
 
     if (victory_delay_counter > 0) {
         // Freeze player in place
+        sound_play_fall(false);
         return;
     }
 
-    if (title_screen_active || game_paused || game_over) return;
-    if (!level_started) return;
+    if (title_screen_active || game_paused || game_over) {
+        sound_play_fall(false);
+        return;
+    }
+    if (!level_started) {
+        sound_play_fall(false);
+        return;
+    }
 
     uint8_t current_tile = get_tile(player.grid_x, player.grid_y);
     uint8_t tile_below = get_tile(player.grid_x, player.grid_y + 1);
@@ -489,6 +500,7 @@ void player_update_motion(void)
 
     // Synchronize is_falling boolean for backward compatibility
     player.is_falling = (player.state == RSTATE_FALL_LEFT || player.state == RSTATE_FALL_RIGHT);
+    sound_play_fall(player.is_falling);
 
     // Update XRAM configurations at 60 Hz
     xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, x_pos_px, player.x_pos_px);
@@ -548,6 +560,7 @@ void player_tick_logic(const input_actions_t *actions)
             
             title_screen_active = false;
             wait_for_input_release = true;
+            music_stop();
         }
         return;
     }
@@ -655,6 +668,7 @@ void player_tick_logic(const input_actions_t *actions)
         set_tile(center_x, center_y, MAP_TILE_EMPTY); // Erases gold from screen & logic
         player_score += 250;
         update_hud();
+        sound_play_gold();
         
         // Check if there is any gold left on the map or held by guards
         uint16_t gold_left = 0;
@@ -681,6 +695,7 @@ void player_tick_logic(const input_actions_t *actions)
     if (player.grid_y == 0 && get_tile(player.grid_x, player.grid_y) == MAP_TILE_LADDER) {
         if (victory_delay_counter == 0) {
             victory_delay_counter = 35; // Start transition delay (~1.5 seconds)
+            sound_play_win();
         }
         return;
     }
@@ -707,6 +722,7 @@ void player_tick_logic(const input_actions_t *actions)
                         player.anim_tick = 0;
                         player.dir = DIR_NONE;
                         did_dig = true;
+                        sound_play_dig();
                     }
                 }
             } else {
@@ -725,6 +741,7 @@ void player_tick_logic(const input_actions_t *actions)
                             player.anim_tick = 0;
                             player.dir = DIR_NONE;
                             did_dig = true;
+                            sound_play_dig();
                         }
                     }
                 } else {
@@ -1583,6 +1600,7 @@ void guards_update_motion(void)
                     g->dir = DIR_NONE;
                     player_score += 75;
                     update_hud();
+                    sound_play_trap();
                 }
             }
 
