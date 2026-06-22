@@ -627,7 +627,7 @@ void player_tick_logic(const input_actions_t *actions)
     // 3. Handle waiting for input release after respawn/load
     if (wait_for_input_release) {
         bool button_pressed = (actions->left || actions->right || actions->up || actions->down || 
-                               actions->fire || actions->bomb);
+                               actions->fire || actions->bomb || actions->land);
         if (!button_pressed) {
             wait_for_input_release = false;
         }
@@ -641,6 +641,17 @@ void player_tick_logic(const input_actions_t *actions)
         } else {
             return;
         }
+    }
+
+    // Handle manual suicide/retry (SELECT button / H key)
+    static bool land_was_pressed = false;
+    bool land_pressed = actions->land;
+    bool land_triggered = land_pressed && !land_was_pressed;
+    land_was_pressed = land_pressed;
+
+    if (land_triggered) {
+        player_die();
+        return;
     }
 
     // 0. Update active holes

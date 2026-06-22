@@ -9,3 +9,4 @@ conversion_notes.md
 *.aseprite
 *.nsf
 *.vgm
+.DS_Store
