@@ -40,6 +40,7 @@ typedef enum {
     GSTATE_TRAP_LEFT,
     GSTATE_TRAP_RIGHT,
     GSTATE_UPDOWN,
+    GSTATE_DEAD,
 } guard_state_t;
 
 typedef struct {

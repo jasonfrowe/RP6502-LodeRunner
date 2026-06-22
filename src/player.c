@@ -19,6 +19,8 @@ static bool ignore_fire = false;
 static bool ignore_bomb = false;
 static bool wait_for_input_release = true;
 static bool game_over_waiting_release = true;
+static uint8_t death_delay_counter = 0;
+static uint8_t victory_delay_counter = 0;
 
 void reset_player_input_state(void)
 {
@@ -27,6 +29,8 @@ void reset_player_input_state(void)
     ignore_bomb = true;
     wait_for_input_release = true;
     game_paused = false;
+    death_delay_counter = 0;
+    victory_delay_counter = 0;
 }
 
 #define MAX_ACTIVE_HOLES 8
@@ -49,6 +53,7 @@ static active_hole_t active_holes[MAX_ACTIVE_HOLES];
 static uint8_t active_holes_count = 0;
 
 static void ai_reborn(uint8_t guard_idx);
+static void ai_kill(uint8_t guard_idx);
 static bool check_runner_guard_collision(void);
 static bool is_guard_trapped_at(int16_t x, int16_t y);
 
@@ -129,28 +134,13 @@ void clear_all_holes(void)
 
 void player_die(void)
 {
+    if (death_delay_counter > 0) return; // Prevent double trigger
+
     if (player_lives > 0) {
         player_lives--;
     }
-    update_hud(); // Sync final 0 lives display
-    if (player_lives == 0) {
-        game_over = true;
-        game_over_waiting_release = true;
-        // Display "GAME OVER" in the middle of text layer
-        RIA.addr0 = TEXT_TILES_MAP_DATA + 145;
-        RIA.step0 = 1;
-        RIA.rw0 = 17; // G
-        RIA.rw0 = 11; // A
-        RIA.rw0 = 23; // M
-        RIA.rw0 = 15; // E
-        RIA.rw0 = 0;  // Space
-        RIA.rw0 = 25; // O
-        RIA.rw0 = 32; // V
-        RIA.rw0 = 15; // E
-        RIA.rw0 = 28; // R
-    } else {
-        reload_level();
-    }
+    update_hud(); // Sync lives display immediately
+    death_delay_counter = 35; // Start transition delay (~1.5 seconds)
 }
 
 void reveal_hidden_ladders(void)
@@ -268,6 +258,20 @@ static bool can_move_to(int16_t x, int16_t y)
 // Called at 60 Hz to update coordinates, scroll offsets, and apply physics
 void player_update_motion(void)
 {
+    if (death_delay_counter > 0) {
+        // Flash player sprite off-screen during death animation
+        int16_t x_val = (death_delay_counter % 8 < 4) ? -32 : player.x_pos_px;
+        int16_t y_val = (death_delay_counter % 8 < 4) ? -32 : player.y_pos_px;
+        xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, x_pos_px, x_val);
+        xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, y_pos_px, y_val);
+        return;
+    }
+
+    if (victory_delay_counter > 0) {
+        // Freeze player in place
+        return;
+    }
+
     if (title_screen_active || game_paused || game_over) return;
     if (!level_started) return;
 
@@ -496,6 +500,40 @@ void player_update_motion(void)
 // Called at 23 Hz to process inputs and tick core logic
 void player_tick_logic(const input_actions_t *actions)
 {
+    // Handle transition delay states
+    if (death_delay_counter > 0) {
+        death_delay_counter--;
+        if (death_delay_counter == 0) {
+            if (player_lives == 0) {
+                game_over = true;
+                game_over_waiting_release = true;
+                // Display "GAME OVER" in the middle of text layer
+                RIA.addr0 = TEXT_TILES_MAP_DATA + 145;
+                RIA.step0 = 1;
+                RIA.rw0 = 17; // G
+                RIA.rw0 = 11; // A
+                RIA.rw0 = 23; // M
+                RIA.rw0 = 15; // E
+                RIA.rw0 = 0;  // Space
+                RIA.rw0 = 25; // O
+                RIA.rw0 = 32; // V
+                RIA.rw0 = 15; // E
+                RIA.rw0 = 28; // R
+            } else {
+                reload_level();
+            }
+        }
+        return;
+    }
+
+    if (victory_delay_counter > 0) {
+        victory_delay_counter--;
+        if (victory_delay_counter == 0) {
+            load_next_level();
+        }
+        return;
+    }
+
     // 0. Handle Title Screen state
     if (title_screen_active) {
         bool button_pressed = (actions->left || actions->right || actions->up || actions->down || 
@@ -641,7 +679,9 @@ void player_tick_logic(const input_actions_t *actions)
 
     // Check if player has reached the top row on a ladder (Level Win condition)
     if (player.grid_y == 0 && get_tile(player.grid_x, player.grid_y) == MAP_TILE_LADDER) {
-        load_next_level();
+        if (victory_delay_counter == 0) {
+            victory_delay_counter = 35; // Start transition delay (~1.5 seconds)
+        }
         return;
     }
 
@@ -910,7 +950,7 @@ static bool guard_occupied(uint8_t me_idx, int16_t x, int16_t y)
     for (uint8_t i = 0; i < MAX_ENEMIES; i++) {
         if (i == me_idx) continue;
         guard_t *g = &guards[i];
-        if (g->active && g->grid_x == x && g->grid_y == y) {
+        if (g->active && g->state != GSTATE_DEAD && g->grid_x == x && g->grid_y == y) {
             return true;
         }
     }
@@ -1183,6 +1223,17 @@ static uint8_t ai_scan(uint8_t guard_idx)
     return d;
 }
 
+static void ai_kill(uint8_t guard_idx)
+{
+    guard_t *g = &guards[guard_idx];
+    g->state = GSTATE_DEAD;
+    g->anim_frame = 46; // Respawn delay: 46 ticks (approx 2 seconds)
+    g->anim_tick = 0;
+    g->dir = DIR_NONE;
+    g->offset_x = 0;
+    g->offset_y = 0;
+}
+
 static void ai_reborn(uint8_t guard_idx)
 {
     guard_t *g = &guards[guard_idx];
@@ -1264,6 +1315,7 @@ static void update_guard_animation(uint8_t guard_idx)
 {
     guard_t *g = &guards[guard_idx];
     if (!g->active) return;
+    if (g->state == GSTATE_DEAD) return;
 
     uint8_t count = 0;
     uint8_t frame_val = 21;
@@ -1404,7 +1456,7 @@ static bool check_runner_guard_collision(void)
 
     for (uint8_t i = 0; i < MAX_ENEMIES; i++) {
         guard_t *g = &guards[i];
-        if (g->active && g->state != GSTATE_REBORN) {
+        if (g->active && g->state != GSTATE_REBORN && g->state != GSTATE_DEAD) {
             // Ignore collision if player is standing on the head of a trapped or climbing-out guard
             if (g->state == GSTATE_TRAP_LEFT || g->state == GSTATE_TRAP_RIGHT) {
                 if (player.grid_y != g->grid_y) {
@@ -1446,7 +1498,7 @@ static bool is_guard_trapped_at(int16_t x, int16_t y)
 
 void guards_update_motion(void)
 {
-    if (title_screen_active || game_paused || game_over) return;
+    if (title_screen_active || game_paused || game_over || death_delay_counter > 0 || victory_delay_counter > 0) return;
     if (!level_started) {
         for (uint8_t i = 0; i < MAX_ENEMIES; i++) {
             guard_t *g = &guards[i];
@@ -1464,7 +1516,9 @@ void guards_update_motion(void)
 
     for (uint8_t i = 0; i < MAX_ENEMIES; i++) {
         guard_t *g = &guards[i];
-        if (!g->active) {
+        if (!g->active || g->state == GSTATE_DEAD) {
+            g->x_pos_px = -32;
+            g->y_pos_px = -32;
             unsigned ptr = ENEMY_CONFIG + (i * sizeof(vga_mode5_sprite_t));
             xram0_struct_set(ptr, vga_mode5_sprite_t, x_pos_px, -32);
             xram0_struct_set(ptr, vga_mode5_sprite_t, y_pos_px, -32);
@@ -1734,7 +1788,7 @@ void guards_tick_logic(void)
         guard_t *g = &guards[iguard];
         if (!g->active) continue;
         
-        if (g->state == GSTATE_TRAP_LEFT || g->state == GSTATE_TRAP_RIGHT || g->state == GSTATE_REBORN) {
+        if (g->state == GSTATE_TRAP_LEFT || g->state == GSTATE_TRAP_RIGHT || g->state == GSTATE_REBORN || g->state == GSTATE_DEAD) {
             moves--;
             continue;
         }
@@ -1769,6 +1823,15 @@ void guards_tick_logic(void)
         guard_t *g = &guards[i];
         if (!g->active) continue;
 
+        if (g->state == GSTATE_DEAD) {
+            if (g->anim_frame > 0) {
+                g->anim_frame--;
+            } else {
+                ai_reborn(i);
+            }
+            continue;
+        }
+
         if (!g->gold && g->goldholds == 0) {
             if (get_tile(g->grid_x, g->grid_y) == MAP_TILE_GOLD) {
                 g->gold = true;
@@ -1778,7 +1841,7 @@ void guards_tick_logic(void)
         }
 
         if (g->state != GSTATE_REBORN && get_tile(g->grid_x, g->grid_y) == MAP_TILE_BRICK) {
-            ai_reborn(i);
+            ai_kill(i);
         }
 
         update_guard_animation(i);
