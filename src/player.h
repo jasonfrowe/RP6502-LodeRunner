@@ -39,6 +39,7 @@ void reveal_hidden_ladders(void);
 
 extern uint8_t current_level;
 extern bool level_started;
+extern bool title_screen_active;
 extern bool game_paused;
 extern bool game_over;
 extern uint32_t player_score;

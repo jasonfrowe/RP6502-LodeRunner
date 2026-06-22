@@ -10,6 +10,7 @@ int16_t start_grid_x = 0;
 int16_t start_grid_y = 0;
 
 bool level_started = false;
+bool title_screen_active = true;
 bool game_paused = false;
 bool game_over = false;
 uint32_t player_score = 0;
@@ -267,7 +268,7 @@ static bool can_move_to(int16_t x, int16_t y)
 // Called at 60 Hz to update coordinates, scroll offsets, and apply physics
 void player_update_motion(void)
 {
-    if (game_paused || game_over) return;
+    if (title_screen_active || game_paused || game_over) return;
     if (!level_started) return;
 
     uint8_t current_tile = get_tile(player.grid_x, player.grid_y);
@@ -495,6 +496,24 @@ void player_update_motion(void)
 // Called at 23 Hz to process inputs and tick core logic
 void player_tick_logic(const input_actions_t *actions)
 {
+    // 0. Handle Title Screen state
+    if (title_screen_active) {
+        bool button_pressed = (actions->left || actions->right || actions->up || actions->down || 
+                               actions->fire || actions->bomb || actions->start);
+        if (button_pressed) {
+            // Clear title screen tiles (rows 1 to 12)
+            RIA.addr0 = TEXT_TILES_MAP_DATA + TEXT_TILES_WIDTH; // Row 1 start
+            RIA.step0 = 1;
+            for (int i = 0; i < 12 * TEXT_TILES_WIDTH; i++) {
+                RIA.rw0 = 0;
+            }
+            
+            title_screen_active = false;
+            wait_for_input_release = true;
+        }
+        return;
+    }
+
     // 1. Handle Game Over state
     if (game_over) {
         bool button_pressed = (actions->left || actions->right || actions->up || actions->down || 
@@ -1427,7 +1446,7 @@ static bool is_guard_trapped_at(int16_t x, int16_t y)
 
 void guards_update_motion(void)
 {
-    if (game_paused || game_over) return;
+    if (title_screen_active || game_paused || game_over) return;
     if (!level_started) {
         for (uint8_t i = 0; i < MAX_ENEMIES; i++) {
             guard_t *g = &guards[i];
