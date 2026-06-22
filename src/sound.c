@@ -176,7 +176,7 @@ void sound_play_dig(void)
     dig_active = true;
     dig_note_idx = 0;
     dig_tick = 0;
-    sfx_note_on(SFX_DIG_CH, &dig_patch, dig_notes[0], 95);
+    sfx_note_on(SFX_DIG_CH, &dig_patch, dig_notes[0], 127);
 }
 
 void sound_play_fall(bool enable)
@@ -186,7 +186,7 @@ void sound_play_fall(bool enable)
             fall_active = true;
             fall_note_idx = 0;
             fall_tick = 0;
-            sfx_note_on(SFX_FALL_CH, &fall_patch, fall_notes[0], 75);
+            sfx_note_on(SFX_FALL_CH, &fall_patch, fall_notes[0], 127);
         }
     } else {
         if (fall_active) {
@@ -201,25 +201,25 @@ void sound_play_trap(void)
     trap_active = true;
     trap_note_idx = 0;
     trap_tick = 0;
-    sfx_note_on(SFX_TRAP_CH, &trap_patch, trap_notes[0], 85);
+    sfx_note_on(SFX_TRAP_CH, &trap_patch, trap_notes[0], 127);
 }
 
 void sound_play_gold(void)
 {
     if (player_sfx_active && player_sfx_prio >= 1u) return;
-    start_player_sfx(1, &gold_patch, gold_notes, GOLD_NOTES, GOLD_NOTE_TICKS, 95);
+    start_player_sfx(1, &gold_patch, gold_notes, GOLD_NOTES, GOLD_NOTE_TICKS, 127);
 }
 
 void sound_play_death(void)
 {
     if (player_sfx_active && player_sfx_prio >= 2u) return;
-    start_player_sfx(2, &death_patch, death_notes, DEATH_NOTES, DEATH_NOTE_TICKS, 110);
+    start_player_sfx(2, &death_patch, death_notes, DEATH_NOTES, DEATH_NOTE_TICKS, 127);
 }
 
 void sound_play_win(void)
 {
     if (player_sfx_active && player_sfx_prio >= 3u) return;
-    start_player_sfx(3, &win_patch, win_notes, WIN_NOTES, WIN_NOTE_TICKS, 115);
+    start_player_sfx(3, &win_patch, win_notes, WIN_NOTES, WIN_NOTE_TICKS, 127);
 }
 
 void sound_update(void)
@@ -234,7 +234,7 @@ void sound_update(void)
                 dig_active = false;
                 stop_channel(SFX_DIG_CH);
             } else {
-                sfx_note_on(SFX_DIG_CH, &dig_patch, dig_notes[dig_note_idx], 95);
+                sfx_note_on(SFX_DIG_CH, &dig_patch, dig_notes[dig_note_idx], 127);
             }
         }
     }
@@ -248,7 +248,7 @@ void sound_update(void)
             if (fall_note_idx >= FALL_NOTES) {
                 fall_note_idx = 0;
             }
-            sfx_note_on(SFX_FALL_CH, &fall_patch, fall_notes[fall_note_idx], 75);
+            sfx_note_on(SFX_FALL_CH, &fall_patch, fall_notes[fall_note_idx], 127);
         }
     }
 
@@ -262,7 +262,7 @@ void sound_update(void)
                 trap_active = false;
                 stop_channel(SFX_TRAP_CH);
             } else {
-                sfx_note_on(SFX_TRAP_CH, &trap_patch, trap_notes[trap_note_idx], 85);
+                sfx_note_on(SFX_TRAP_CH, &trap_patch, trap_notes[trap_note_idx], 127);
             }
         }
     }

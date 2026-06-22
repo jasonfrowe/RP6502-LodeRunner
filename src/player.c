@@ -84,8 +84,6 @@ static void set_tile(int16_t x, int16_t y, uint8_t tile_id)
 // Helper to check if a tile is empty/passable as space
 static bool is_empty_tile(uint8_t tile)
 {
-    if (tile >= 16 && tile <= 23) return false;
-    if (tile >= 34 && tile <= 41) return false;
     return tile == MAP_TILE_EMPTY || tile == MAP_TILE_FALSE || tile == MAP_TILE_GOLD || tile == MAP_TILE_RUNNER || tile == MAP_TILE_GUARD || (tile >= 7 && tile <= 42) || tile == MAP_TILE_HLADDER;
 }
 
@@ -718,6 +716,8 @@ void player_tick_logic(const input_actions_t *actions)
                         
                         add_hole(player.grid_x - 1, player.grid_y + 1, true);
                         player.state = RSTATE_DIG_LEFT;
+                        player.offset_x = 0;
+                        player.offset_y = 0;
                         player.anim_frame = 0;
                         player.anim_tick = 0;
                         player.dir = DIR_NONE;
@@ -737,6 +737,8 @@ void player_tick_logic(const input_actions_t *actions)
                             
                             add_hole(player.grid_x + 1, player.grid_y + 1, false);
                             player.state = RSTATE_DIG_RIGHT;
+                            player.offset_x = 0;
+                            player.offset_y = 0;
                             player.anim_frame = 0;
                             player.anim_tick = 0;
                             player.dir = DIR_NONE;
@@ -1588,7 +1590,7 @@ void guards_update_motion(void)
             }
 
             if (g->offset_y <= 0) {
-                if (is_hole_fully_formed(g->grid_x, g->grid_y)) {
+                if (is_active_hole(g->grid_x, g->grid_y)) {
                     g->state = (g->state == GSTATE_FALL_LEFT) ? GSTATE_TRAP_LEFT : GSTATE_TRAP_RIGHT;
                     g->offset_x = 0;
                     g->offset_y = 0;
