@@ -28,7 +28,7 @@ static const uint16_t texttiles_4bpp[16] = {
     0x0000,
     0x1020,
     0x0560,
-    0xAD60,
+    0xFD21,
     0x0035,
     0xA835,
     0x02B5,
