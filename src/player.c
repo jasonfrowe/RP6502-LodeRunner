@@ -59,6 +59,7 @@ static void ai_reborn(uint8_t guard_idx);
 static void ai_kill(uint8_t guard_idx);
 static bool check_runner_guard_collision(void);
 static bool is_guard_trapped_at(int16_t x, int16_t y);
+static bool guard_occupied(uint8_t me_idx, int16_t x, int16_t y);
 
 // Reads tile ID from the tilemap stored in XRAM at grid position (x, y)
 static uint8_t get_tile(int16_t x, int16_t y)
@@ -85,6 +86,10 @@ static void set_tile(int16_t x, int16_t y, uint8_t tile_id)
 // Helper to check if a tile is empty/passable as space
 static bool is_empty_tile(uint8_t tile)
 {
+    // Digging bottom frames (16-23 and 34-41) are solid until digging completes
+    if ((tile >= 16 && tile <= 23) || (tile >= 34 && tile <= 41)) {
+        return false;
+    }
     return tile == MAP_TILE_EMPTY || tile == MAP_TILE_FALSE || tile == MAP_TILE_GOLD || tile == MAP_TILE_RUNNER || tile == MAP_TILE_GUARD || (tile >= 7 && tile <= 42) || tile == MAP_TILE_HLADDER;
 }
 
@@ -136,6 +141,8 @@ void clear_all_holes(void)
 void player_die(void)
 {
     if (death_delay_counter > 0) return; // Prevent double trigger
+
+    clear_all_holes(); // Immediately restore map tiles (cancels active digs/holes)
 
     if (player_lives > 0) {
         player_lives--;
@@ -700,30 +707,48 @@ void player_tick_logic(const input_actions_t *actions)
 
     // 2. If center overlaps with gold, collect it
     if (get_tile(center_x, center_y) == MAP_TILE_GOLD) {
-        set_tile(center_x, center_y, MAP_TILE_EMPTY); // Erases gold from screen & logic
-        player_score += 250;
-        update_hud();
-        sound_play_gold();
-        
-        // Check if there is any gold left on the map or held by guards
-        uint16_t gold_left = 0;
-        RIA.addr0 = TILEMAP_DATA;
-        RIA.step0 = 1;
-        for (int i = 0; i < TILEMAP_WIDTH * TILEMAP_HEIGHT; i++) {
-            if (RIA.rw0 == MAP_TILE_GOLD) {
-                gold_left++;
+        uint8_t tile_below = get_tile(center_x, center_y + 1);
+        bool passable_below = (is_empty_tile(tile_below) || tile_below == MAP_TILE_ROPE);
+        bool can_collect = false;
+
+        if (!passable_below) {
+            can_collect = true;
+        } else {
+            // Gold is hanging in the air. Only collect if falling from above or a guard is below
+            bool is_falling = (player.state == RSTATE_FALL_LEFT || player.state == RSTATE_FALL_RIGHT);
+            if (is_falling && player.offset_y < 0) {
+                can_collect = true;
+            } else if (guard_occupied(0xFF, center_x, center_y + 1)) {
+                can_collect = true;
             }
         }
-        
-        for (uint8_t i = 0; i < MAX_ENEMIES; i++) {
-            if (guards[i].active && guards[i].gold) {
-                gold_left++;
+
+        if (can_collect) {
+            set_tile(center_x, center_y, MAP_TILE_EMPTY); // Erases gold from screen & logic
+            player_score += 250;
+            update_hud();
+            sound_play_gold();
+            
+            // Check if there is any gold left on the map or held by guards
+            uint16_t gold_left = 0;
+            RIA.addr0 = TILEMAP_DATA;
+            RIA.step0 = 1;
+            for (int i = 0; i < TILEMAP_WIDTH * TILEMAP_HEIGHT; i++) {
+                if (RIA.rw0 == MAP_TILE_GOLD) {
+                    gold_left++;
+                }
             }
-        }
-        
-        if (gold_left == 0) {
-            reveal_hidden_ladders();
-            sound_play_hladder();
+            
+            for (uint8_t i = 0; i < MAX_ENEMIES; i++) {
+                if (guards[i].active && guards[i].gold) {
+                    gold_left++;
+                }
+            }
+            
+            if (gold_left == 0) {
+                reveal_hidden_ladders();
+                sound_play_hladder();
+            }
         }
     }
 
@@ -1070,7 +1095,7 @@ static uint8_t ai_scan_level(uint8_t guard_idx)
         bool gd = guard_occupied(guard_idx, gx, gy + 1);
 
         if (lvl == MAP_TILE_LADDER || lvl == MAP_TILE_ROPE
-            || (nextlvl == MAP_TILE_EMPTY && hole)
+            || hole
             || nextlvl == MAP_TILE_SOLID
             || nextlvl == MAP_TILE_LADDER
             || nextlvl == MAP_TILE_BRICK
@@ -1426,7 +1451,7 @@ static void update_guard_animation(uint8_t guard_idx)
             break;
         case GSTATE_TRAP_LEFT:
             count = 6;
-            if (g->anim_frame == 0) { frame_val = 37; duration_val = 37; }
+            if (g->anim_frame == 0) { frame_val = 37; duration_val = 51; }
             else if (g->anim_frame == 1) { frame_val = 38; duration_val = 3; }
             else if (g->anim_frame == 2) { frame_val = 39; duration_val = 3; }
             else if (g->anim_frame == 3) { frame_val = 38; duration_val = 3; }
@@ -1435,7 +1460,7 @@ static void update_guard_animation(uint8_t guard_idx)
             break;
         case GSTATE_TRAP_RIGHT:
             count = 6;
-            if (g->anim_frame == 0) { frame_val = 26; duration_val = 37; }
+            if (g->anim_frame == 0) { frame_val = 26; duration_val = 51; }
             else if (g->anim_frame == 1) { frame_val = 27; duration_val = 3; }
             else if (g->anim_frame == 2) { frame_val = 28; duration_val = 3; }
             else if (g->anim_frame == 3) { frame_val = 27; duration_val = 3; }
@@ -1458,8 +1483,7 @@ static void update_guard_animation(uint8_t guard_idx)
                     g->anim_frame = 0;
                     g->anim_tick = 0;
                     g->hole = true;
-                    g->offset_y = 5;
-                    g->grid_y -= 1;
+                    g->offset_y = 0;
                 } else if (g->state == GSTATE_REBORN) {
                     g->state = GSTATE_FALL_RIGHT;
                     g->anim_frame = 0;
@@ -1517,13 +1541,8 @@ static bool check_runner_guard_collision(void)
         guard_t *g = &guards[i];
         if (g->active && g->state != GSTATE_REBORN && g->state != GSTATE_DEAD) {
             // Ignore collision if player is standing on the head of a trapped or climbing-out guard
-            if (g->state == GSTATE_TRAP_LEFT || g->state == GSTATE_TRAP_RIGHT) {
-                if (player.grid_y != g->grid_y) {
-                    continue;
-                }
-            }
-            if (g->state == GSTATE_CLIMB_OUT) {
-                if (player.grid_y != g->grid_y + 1) {
+            if (g->state == GSTATE_TRAP_LEFT || g->state == GSTATE_TRAP_RIGHT || g->state == GSTATE_CLIMB_OUT) {
+                if (player.grid_y == g->holey - 1) {
                     continue;
                 }
             }
@@ -1544,11 +1563,10 @@ static bool is_guard_trapped_at(int16_t x, int16_t y)
     for (uint8_t i = 0; i < MAX_ENEMIES; i++) {
         guard_t *g = &guards[i];
         if (g->active && g->grid_x == x) {
-            if (g->grid_y == y && (g->state == GSTATE_TRAP_LEFT || g->state == GSTATE_TRAP_RIGHT)) {
-                return true;
-            }
-            if (g->grid_y == y - 1 && g->state == GSTATE_CLIMB_OUT) {
-                return true;
+            if (g->state == GSTATE_TRAP_LEFT || g->state == GSTATE_TRAP_RIGHT || g->state == GSTATE_CLIMB_OUT) {
+                if (g->holey == y) {
+                    return true;
+                }
             }
         }
     }
@@ -1677,7 +1695,7 @@ void guards_update_motion(void)
                 ai_drop_gold(i);
             }
 
-            if (g->offset_y <= 0) {
+            if (g->offset_y <= 0 && g->grid_y == g->holey - 1) {
                 g->offset_y = 0;
                 g->state = GSTATE_STOP;
                 g->dir = DIR_NONE;
@@ -1907,6 +1925,14 @@ void guards_tick_logic(void)
                 g->gold = true;
                 g->goldholds = (rand() % 26) + 11;
                 set_tile(g->grid_x, g->grid_y, MAP_TILE_EMPTY);
+            }
+        }
+
+        if (g->state != GSTATE_TRAP_LEFT && g->state != GSTATE_TRAP_RIGHT && g->state != GSTATE_REBORN && g->state != GSTATE_DEAD && g->state != GSTATE_CLIMB_OUT) {
+            if (!g->hole && ai_falling(i)) {
+                g->dir = DIR_FALL;
+                g->state = (g->state == GSTATE_LEFT || g->state == GSTATE_CLIMB_LEFT || g->state == GSTATE_FALL_LEFT) ? GSTATE_FALL_LEFT : GSTATE_FALL_RIGHT;
+                g->offset_x = 0;
             }
         }
 

@@ -14,7 +14,7 @@ rp6502_asset(LodeRunner help src/help.txt)
 rp6502_asset(LodeRunner 0x10000 images/player_4bpp.bin)
 rp6502_asset(LodeRunner 0x11400 images/maptiles_4bpp.bin)
 rp6502_asset(LodeRunner 0x12B80 maps/default.bin)
-rp6502_asset(LodeRunner 0x12D40 images/texttiles_4bpp.bin)
+rp6502_asset(LodeRunner 0x12D5C images/texttiles_4bpp.bin)
 
 # Pack concatenated level maps to ROM
 rp6502_asset(LodeRunner maps maps/maps.bin)

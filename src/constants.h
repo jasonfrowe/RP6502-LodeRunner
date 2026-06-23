@@ -26,7 +26,7 @@
 #define TILE_SIZE_Y             11                 // Tiles are 11 pixels high
 
 #define TILEMAP_DATA           (TILE_DATA + TILE_DATA_SIZE) // Address for tilemap data
-#define TILEMAP_DATA_SIZE       0x1C0U             // 448 bytes for tilemap data
+#define TILEMAP_DATA_SIZE       0x1DCU             // 476 bytes for tilemap data - is 28x17 (extra row at bottom for ground)
 #define TILEMAP_WIDTH           28                 // Width of terrain tileset in pixels
 #define TILEMAP_HEIGHT          16                 // Height of terrain tileset in pixels
 #define WORLD_WIDTH_PX         (TILEMAP_WIDTH * TILE_SIZE_X)  // Total width of the world in pixels

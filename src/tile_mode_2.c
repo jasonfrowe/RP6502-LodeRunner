@@ -33,11 +33,17 @@ void tile_mode2_init(void)
     xram0_struct_set(TILE_GROUND_CONFIG, vga_mode2_config_t, x_pos_px, 20);
     xram0_struct_set(TILE_GROUND_CONFIG, vga_mode2_config_t, y_pos_px, 30);
     xram0_struct_set(TILE_GROUND_CONFIG, vga_mode2_config_t, width_tiles,  TILEMAP_WIDTH);
-    xram0_struct_set(TILE_GROUND_CONFIG, vga_mode2_config_t, height_tiles, TILEMAP_HEIGHT);
+    xram0_struct_set(TILE_GROUND_CONFIG, vga_mode2_config_t, height_tiles, (TILEMAP_HEIGHT + 1)); // extra row for static ground tiles.
     xram0_struct_set(TILE_GROUND_CONFIG, vga_mode2_config_t, xram_data_ptr, TILEMAP_DATA); // tile ID grid
     xram0_struct_set(TILE_GROUND_CONFIG, vga_mode2_config_t, xram_palette_ptr, TILE_PALETTE_ADDR);
     xram0_struct_set(TILE_GROUND_CONFIG, vga_mode2_config_t, xram_tile_ptr, TILE_DATA);        // tile bitmaps
 
+    // Add in ground level
+    RIA.addr0 = TILEMAP_DATA + (TILEMAP_HEIGHT * TILEMAP_WIDTH);
+    RIA.step0 = 1;
+    for (int i = 0; i < TILEMAP_WIDTH; i++) {
+        RIA.rw0 = 3; // Ground tile ID
+    }
 
     // Mode 2 args: MODE, OPTIONS, CONFIG, PLANE, BEGIN, END
     // OPTIONS: bit3=1 (8x8 tiles), bit[2:0]=2 (8-bit color index) => 0b1010 = 0x0A
