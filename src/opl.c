@@ -152,6 +152,7 @@ static uint16_t music_bytes_ready = 0;
 static uint16_t music_wait_ticks = 0;
 static bool music_error_state = false;
 static bool music_just_looped = false;
+static bool music_paused = false;
 
 void music_init(const char* filename) {
     if (music_fd >= 0) close(music_fd);
@@ -160,6 +161,7 @@ void music_init(const char* filename) {
     music_buf_idx = 0;
     music_wait_ticks = 0;
     music_just_looped = false;
+    music_paused = false;
     music_error_state = (music_fd < 0);
 
     if (music_error_state) {
@@ -181,11 +183,28 @@ void music_stop(void) {
         close(music_fd);
         music_fd = -1;
     }
+    music_paused = false;
     opl_init();
 }
 
+void music_pause(void) {
+    if (music_fd >= 0 && !music_error_state) {
+        music_paused = true;
+        // Kill hanging notes by keying off BGM channels 0, 1, 2, 3
+        for (uint8_t i = 0; i < 4; i++) {
+            opl_write(0xB0 + i, 0x00);
+        }
+    }
+}
+
+void music_resume(void) {
+    if (music_fd >= 0 && !music_error_state) {
+        music_paused = false;
+    }
+}
+
 void update_music() {
-    if (music_error_state || music_fd < 0) return;
+    if (music_paused || music_error_state || music_fd < 0) return;
 
     if (music_wait_ticks > 0) {
         music_wait_ticks--;

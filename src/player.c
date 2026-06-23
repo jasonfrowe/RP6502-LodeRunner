@@ -150,6 +150,7 @@ void player_die(void)
     }
     update_hud(); // Sync lives display immediately
     death_delay_counter = 35; // Start transition delay (~1.5 seconds)
+    music_stop();
     sound_play_death();
 }
 
@@ -526,6 +527,13 @@ static void check_victory_ladders(void)
     }
 }
 
+static const char* get_level_bgm(uint8_t lvl) {
+    uint8_t index = (lvl - 1) % 3;
+    if (index == 0) return "ROM:loderun3";
+    if (index == 1) return "ROM:loderun4";
+    return "ROM:loderun5";
+}
+
 // Called at 23 Hz to process inputs and tick core logic
 void player_tick_logic(const input_actions_t *actions)
 {
@@ -537,6 +545,7 @@ void player_tick_logic(const input_actions_t *actions)
                 game_over = true;
                 game_over_waiting_release = true;
                 game_over_timer = 690; // 30 seconds at 23 Hz
+                music_init("ROM:loderun");
                 // Display "GAME OVER" in the middle of text layer
                 RIA.addr0 = TEXT_TILES_MAP_DATA + 145;
                 RIA.step0 = 1;
@@ -616,7 +625,7 @@ void player_tick_logic(const input_actions_t *actions)
                 player_score = 0;
                 player_lives = 5;
                 load_level(1);
-                music_init("ROM:loderun");
+                music_init("ROM:loderun2");
                 return;
             }
         }
@@ -662,6 +671,7 @@ void player_tick_logic(const input_actions_t *actions)
     if (start_triggered) {
         if (game_paused) {
             game_paused = false;
+            music_resume();
             // Clear "PAUSED" text from the screen
             RIA.addr0 = TEXT_TILES_MAP_DATA + 147;
             RIA.step0 = 1;
@@ -670,6 +680,7 @@ void player_tick_logic(const input_actions_t *actions)
             }
         } else {
             game_paused = true;
+            music_pause();
             // Draw "PAUSED"
             RIA.addr0 = TEXT_TILES_MAP_DATA + 147;
             RIA.step0 = 1;
@@ -700,6 +711,7 @@ void player_tick_logic(const input_actions_t *actions)
     if (!level_started) {
         if (actions->left || actions->right || actions->up || actions->down || actions->fire || actions->bomb) {
             level_started = true;
+            music_init(get_level_bgm(current_level));
         } else {
             return;
         }
@@ -767,6 +779,7 @@ void player_tick_logic(const input_actions_t *actions)
         if (victory_delay_counter == 0) {
             victory_delay_counter = 35; // Start transition delay (~1.5 seconds)
             sound_play_win();
+            music_stop();
         }
         return;
     }
@@ -1944,12 +1957,6 @@ void guards_tick_logic(void)
                     g->goldholds = -2;
                     g->stuck_ticks = 0;
                     
-                    if (get_tile(g->grid_x, g->grid_y - 1) == MAP_TILE_EMPTY) {
-                        set_tile(g->grid_x, g->grid_y - 1, MAP_TILE_GOLD);
-                    } else if (get_tile(g->grid_x, g->grid_y) == MAP_TILE_EMPTY) {
-                        set_tile(g->grid_x, g->grid_y, MAP_TILE_GOLD);
-                    }
-                    
                     check_victory_ladders();
                 }
             } else {
@@ -1989,12 +1996,14 @@ void guards_tick_logic(void)
 void update_hud(void)
 {
     uint32_t score = player_score;
-    uint8_t d5, d4, d3, d2, d1, d0;
+    uint8_t d6, d5, d4, d3, d2, d1, d0;
     
-    if (score > 999999) {
-        score = 999999;
+    if (score > 9999999) {
+        score = 9999999;
     }
     
+    d6 = score / 1000000;
+    score %= 1000000;
     d5 = score / 100000;
     score %= 100000;
     d4 = score / 10000;
@@ -2008,6 +2017,7 @@ void update_hud(void)
     
     RIA.addr0 = HUD_MAP_DATA + 5;
     RIA.step0 = 1;
+    RIA.rw0 = d6 + 1;
     RIA.rw0 = d5 + 1;
     RIA.rw0 = d4 + 1;
     RIA.rw0 = d3 + 1;

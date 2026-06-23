@@ -29,6 +29,8 @@ extern void opl_silence_all(void);
 extern void OPL_Config(uint8_t enable, uint16_t addr);
 extern void music_init(const char* filename);
 extern void music_stop(void);
+extern void music_pause(void);
+extern void music_resume(void);
 extern void OPL_SetPatch(uint8_t channel, const OPL_Patch* patch);
 extern void shutdown_audio(void);
 

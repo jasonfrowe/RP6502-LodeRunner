@@ -82,7 +82,8 @@ void tile_mode2_init(void)
     RIA.rw0 = 25; // O
     RIA.rw0 = 28; // R
     RIA.rw0 = 15; // E
-    RIA.rw0 = 1;  // 01
+    RIA.rw0 = 1;  // 0
+    RIA.rw0 = 1;  // 0
     RIA.rw0 = 1;  // 0
     RIA.rw0 = 1;  // 0
     RIA.rw0 = 1;  // 0
@@ -92,7 +93,6 @@ void tile_mode2_init(void)
     RIA.rw0 = 23; // M
     RIA.rw0 = 15; // E
     RIA.rw0 = 24; // N
-    RIA.rw0 = 0;  // blank
     RIA.rw0 = 1;  // 0
     RIA.rw0 = 1;  // 0
     RIA.rw0 = 6;  // 5

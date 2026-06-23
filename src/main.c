@@ -51,7 +51,7 @@ int main(void)
     OPL_Config(1, OPL_ADDR);
     opl_init();
     sound_init();
-    music_init("ROM:loderun");
+    music_init("ROM:loderun2");
 
     if (!init_video()) {
         return 1;
