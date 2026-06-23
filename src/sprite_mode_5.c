@@ -122,22 +122,11 @@ void sprite_mode5_players_init(void){
                 player.anim_frame = 0;
                 player.anim_tick = 0;
 
-                int16_t wx = col << 4;
-                int16_t wy = row << 4;
+                int16_t wx = col * 10;
+                int16_t wy = row * 11;
 
-                player.world_x_px = SCREEN_WIDTH_D2 - wx;
-                if (player.world_x_px > 0) {
-                    player.world_x_px = 0;
-                } else if (player.world_x_px < -128) {
-                    player.world_x_px = -128;
-                }
-
-                player.world_y_px = 112 - wy;
-                if (player.world_y_px > 0) {
-                    player.world_y_px = 0;
-                } else if (player.world_y_px < -32) {
-                    player.world_y_px = -32;
-                }
+                player.world_x_px = 20;
+                player.world_y_px = 30;
 
                 player.x_pos_px = wx + player.world_x_px;
                 player.y_pos_px = wy + player.world_y_px;
@@ -185,8 +174,8 @@ void sprite_mode5_players_init(void){
     for (uint8_t i = 0; i < MAX_ENEMIES; i++) {
         guard_t *g = &guards[i];
         if (g->active) {
-            g->x_pos_px = (g->grid_x << 4) + player.world_x_px;
-            g->y_pos_px = (g->grid_y << 4) + player.world_y_px;
+            g->x_pos_px = (g->grid_x * 10) + player.world_x_px;
+            g->y_pos_px = (g->grid_y * 11) + player.world_y_px;
         }
     }
 

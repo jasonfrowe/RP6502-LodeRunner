@@ -305,17 +305,17 @@ void player_update_motion(void)
             }
         }
 
-        int16_t step = 1;
-        uint16_t accum = player.sub_y + 58;
+        int16_t step = 0;
+        uint16_t accum = player.sub_y + 216;
         player.sub_y = (uint8_t)accum;
         step += (accum >> 8);
 
         player.offset_x = 0; // Centered horizontally
         player.offset_y += step;
 
-        if (player.offset_y > 8) {
+        if (player.offset_y > 5) {
             player.grid_y += 1;
-            player.offset_y -= 16;
+            player.offset_y -= 11;
         }
 
         uint8_t check_tile = get_tile(player.grid_x, player.grid_y);
@@ -335,15 +335,15 @@ void player_update_motion(void)
         }
     }
     else if (player.dir != DIR_NONE) {
-        int16_t step = 1;
+        int16_t step = 0;
         uint16_t accum;
 
         if (player.dir == DIR_LEFT || player.dir == DIR_RIGHT) {
-            accum = player.sub_x + 58;
+            accum = player.sub_x + 196;
             player.sub_x = (uint8_t)accum;
             step += (accum >> 8);
         } else {
-            accum = player.sub_y + 58;
+            accum = player.sub_y + 216;
             player.sub_y = (uint8_t)accum;
             step += (accum >> 8);
         }
@@ -351,9 +351,9 @@ void player_update_motion(void)
         if (player.dir == DIR_LEFT) {
             int16_t next_tx = player.offset_x - step;
             int16_t next_grid_x = player.grid_x;
-            if (next_tx < -8) {
+            if (next_tx < -5) {
                 next_grid_x -= 1;
-                next_tx += 16;
+                next_tx += 10;
             }
 
             if (next_tx < 0 && !can_move_to(next_grid_x - 1, player.grid_y)) {
@@ -375,9 +375,9 @@ void player_update_motion(void)
         else if (player.dir == DIR_RIGHT) {
             int16_t next_tx = player.offset_x + step;
             int16_t next_grid_x = player.grid_x;
-            if (next_tx > 8) {
+            if (next_tx > 5) {
                 next_grid_x += 1;
-                next_tx -= 16;
+                next_tx -= 10;
             }
 
             if (next_tx > 0 && !can_move_to(next_grid_x + 1, player.grid_y)) {
@@ -399,9 +399,9 @@ void player_update_motion(void)
         else if (player.dir == DIR_UP) {
             int16_t next_ty = player.offset_y - step;
             int16_t next_grid_y = player.grid_y;
-            if (next_ty < -8) {
+            if (next_ty < -5) {
                 next_grid_y -= 1;
-                next_ty += 16;
+                next_ty += 11;
             }
 
             uint8_t curr_tile = get_tile(player.grid_x, next_grid_y);
@@ -420,9 +420,9 @@ void player_update_motion(void)
         else if (player.dir == DIR_DOWN) {
             int16_t next_ty = player.offset_y + step;
             int16_t next_grid_y = player.grid_y;
-            if (next_ty > 8) {
+            if (next_ty > 5) {
                 next_grid_y += 1;
-                next_ty -= 16;
+                next_ty -= 11;
             }
 
             uint8_t curr_tile = get_tile(player.grid_x, next_grid_y);
@@ -461,30 +461,12 @@ void player_update_motion(void)
     }
 
     // Calculate world pixels from the grid and offsets
-    int16_t wx = (player.grid_x << 4) + player.offset_x;
-    int16_t wy = (player.grid_y << 4) + player.offset_y;
+    int16_t wx = (player.grid_x * 10) + player.offset_x;
+    int16_t wy = (player.grid_y * 11) + player.offset_y;
 
-    // Convert to target camera scroll positions to center the player
-    int16_t target_scroll_x = SCREEN_WIDTH_D2 - wx;
-    int16_t target_scroll_y = 112 - wy;
-
-    // Clamp the camera scroll offset so the tilemap is always fully on-screen
-    // The screen size is 320x240, and the tilemap is 448x256 pixels.
-    // Scroll range X: [320 - 448, 0] = [-128, 0]
-    // Scroll range Y: [224 - 256, 0] = [-32, 0] (leaving bottom 16 pixels for HUD)
-    player.world_x_px = target_scroll_x;
-    if (player.world_x_px > 0) {
-        player.world_x_px = 0;
-    } else if (player.world_x_px < -128) {
-        player.world_x_px = -128;
-    }
-
-    player.world_y_px = target_scroll_y;
-    if (player.world_y_px > 0) {
-        player.world_y_px = 0;
-    } else if (player.world_y_px < -32) {
-        player.world_y_px = -32;
-    }
+    // Center the map statically at offset (20, 30)
+    player.world_x_px = 20;
+    player.world_y_px = 30;
 
     // Calculate player sprite screen coordinates
     player.x_pos_px = wx + player.world_x_px;
@@ -667,10 +649,10 @@ void player_tick_logic(const input_actions_t *actions)
     }
 
     // 1. Gather current center coordinates for item collection
-    int16_t px = (player.grid_x << 4) + player.offset_x;
-    int16_t py = (player.grid_y << 4) + player.offset_y;
-    int16_t center_x = (px + 8) >> 4;
-    int16_t center_y = (py + 8) >> 4;
+    int16_t px = (player.grid_x * 10) + player.offset_x;
+    int16_t py = (player.grid_y * 11) + player.offset_y;
+    int16_t center_x = (px + 5) / 10;
+    int16_t center_y = (py + 5) / 11;
 
     // 2. If center overlaps with gold, collect it
     if (get_tile(center_x, center_y) == MAP_TILE_GOLD) {
@@ -1430,7 +1412,7 @@ static void update_guard_animation(uint8_t guard_idx)
                     g->anim_frame = 0;
                     g->anim_tick = 0;
                     g->hole = true;
-                    g->offset_y = 8;
+                    g->offset_y = 5;
                     g->grid_y -= 1;
                 } else if (g->state == GSTATE_REBORN) {
                     g->state = GSTATE_FALL_RIGHT;
@@ -1482,8 +1464,8 @@ static void update_guard_animation(uint8_t guard_idx)
 
 static bool check_runner_guard_collision(void)
 {
-    int16_t px = (player.grid_x << 4) + player.offset_x;
-    int16_t py = (player.grid_y << 4) + player.offset_y;
+    int16_t px = (player.grid_x * 10) + player.offset_x;
+    int16_t py = (player.grid_y * 11) + player.offset_y;
 
     for (uint8_t i = 0; i < MAX_ENEMIES; i++) {
         guard_t *g = &guards[i];
@@ -1500,10 +1482,10 @@ static bool check_runner_guard_collision(void)
                 }
             }
 
-            int16_t gx = (g->grid_x << 4) + g->offset_x;
-            int16_t gy = (g->grid_y << 4) + g->offset_y;
+            int16_t gx = (g->grid_x * 10) + g->offset_x;
+            int16_t gy = (g->grid_y * 11) + g->offset_y;
 
-            if (abs(px - gx) < 10 && abs(py - gy) < 10) {
+            if (abs(px - gx) < 6 && abs(py - gy) < 6) {
                 return true;
             }
         }
@@ -1557,8 +1539,8 @@ void guards_update_motion(void)
         }
 
         if (g->state == GSTATE_REBORN || g->state == GSTATE_TRAP_LEFT || g->state == GSTATE_TRAP_RIGHT) {
-            g->x_pos_px = (g->grid_x << 4) + player.world_x_px;
-            g->y_pos_px = (g->grid_y << 4) + player.world_y_px;
+            g->x_pos_px = (g->grid_x * 10) + player.world_x_px;
+            g->y_pos_px = (g->grid_y * 11) + player.world_y_px;
             unsigned ptr = ENEMY_CONFIG + (i * sizeof(vga_mode5_sprite_t));
             xram0_struct_set(ptr, vga_mode5_sprite_t, x_pos_px, g->x_pos_px);
             xram0_struct_set(ptr, vga_mode5_sprite_t, y_pos_px, g->y_pos_px);
@@ -1588,17 +1570,17 @@ void guards_update_motion(void)
                 g->dir = DIR_FALL;
             }
 
-            int16_t step = 1;
-            uint16_t accum = g->sub_y + 26;
+            int16_t step = 0;
+            uint16_t accum = g->sub_y + 194;
             g->sub_y = (uint8_t)accum;
             step += (accum >> 8);
 
             g->offset_x = 0;
             g->offset_y += step;
 
-            if (g->offset_y > 8) {
+            if (g->offset_y > 5) {
                 g->grid_y += 1;
-                g->offset_y -= 16;
+                g->offset_y -= 11;
             }
 
             if (g->offset_y <= 0) {
@@ -1626,17 +1608,17 @@ void guards_update_motion(void)
             }
         }
         else if (g->state == GSTATE_CLIMB_OUT) {
-            int16_t step = 1;
-            uint16_t accum = g->sub_y + 26;
+            int16_t step = 0;
+            uint16_t accum = g->sub_y + 194;
             g->sub_y = (uint8_t)accum;
             step += (accum >> 8);
 
             g->offset_x = 0;
             g->offset_y -= step;
 
-            if (g->offset_y < -8) {
+            if (g->offset_y < -5) {
                 g->grid_y -= 1;
-                g->offset_y += 16;
+                g->offset_y += 11;
             }
 
             if (g->offset_y <= 0) {
@@ -1646,15 +1628,15 @@ void guards_update_motion(void)
             }
         }
         else if (g->dir != DIR_NONE) {
-            int16_t step = 1;
+            int16_t step = 0;
             uint16_t accum;
 
             if (g->dir == DIR_LEFT || g->dir == DIR_RIGHT) {
-                accum = g->sub_x + 26;
+                accum = g->sub_x + 176;
                 g->sub_x = (uint8_t)accum;
                 step += (accum >> 8);
             } else {
-                accum = g->sub_y + 26;
+                accum = g->sub_y + 194;
                 g->sub_y = (uint8_t)accum;
                 step += (accum >> 8);
             }
@@ -1662,9 +1644,9 @@ void guards_update_motion(void)
             if (g->dir == DIR_LEFT) {
                 int16_t next_tx = g->offset_x - step;
                 int16_t next_grid_x = g->grid_x;
-                if (next_tx < -8) {
+                if (next_tx < -5) {
                     next_grid_x -= 1;
-                    next_tx += 16;
+                    next_tx += 10;
                     g->hole = false;
                     g->holey = -1;
                     ai_drop_gold(i);
@@ -1690,9 +1672,9 @@ void guards_update_motion(void)
             else if (g->dir == DIR_RIGHT) {
                 int16_t next_tx = g->offset_x + step;
                 int16_t next_grid_x = g->grid_x;
-                if (next_tx > 8) {
+                if (next_tx > 5) {
                     next_grid_x += 1;
-                    next_tx -= 16;
+                    next_tx -= 10;
                     g->hole = false;
                     g->holey = -1;
                     ai_drop_gold(i);
@@ -1718,9 +1700,9 @@ void guards_update_motion(void)
             else if (g->dir == DIR_UP) {
                 int16_t next_ty = g->offset_y - step;
                 int16_t next_grid_y = g->grid_y;
-                if (next_ty < -8) {
+                if (next_ty < -5) {
                     next_grid_y -= 1;
-                    next_ty += 16;
+                    next_ty += 11;
                     ai_drop_gold(i);
                 }
 
@@ -1741,9 +1723,9 @@ void guards_update_motion(void)
             else if (g->dir == DIR_DOWN) {
                 int16_t next_ty = g->offset_y + step;
                 int16_t next_grid_y = g->grid_y;
-                if (next_ty > 8) {
+                if (next_ty > 5) {
                     next_grid_y += 1;
-                    next_ty -= 16;
+                    next_ty -= 11;
                     ai_drop_gold(i);
                 }
 
@@ -1781,8 +1763,8 @@ void guards_update_motion(void)
             }
         }
 
-        g->x_pos_px = (g->grid_x << 4) + g->offset_x + player.world_x_px;
-        g->y_pos_px = (g->grid_y << 4) + g->offset_y + player.world_y_px;
+        g->x_pos_px = (g->grid_x * 10) + g->offset_x + player.world_x_px;
+        g->y_pos_px = (g->grid_y * 11) + g->offset_y + player.world_y_px;
 
         unsigned ptr = ENEMY_CONFIG + (i * sizeof(vga_mode5_sprite_t));
         xram0_struct_set(ptr, vga_mode5_sprite_t, x_pos_px, g->x_pos_px);

@@ -22,14 +22,15 @@
 
 #define TILE_DATA              (PLAYER_DATA + PLAYER_DATA_SIZE) // Address for tile bitmap data
 #define TILE_DATA_SIZE          0x1780U            // 6016 bytes 47 x 16x16 tiles at 4bpp)
-#define TILE_SIZE               16                 // Tiles are 16x16 pixels
+#define TILE_SIZE_X             10                 // Tiles are 10 pixels wide
+#define TILE_SIZE_Y             11                 // Tiles are 11 pixels high
 
 #define TILEMAP_DATA           (TILE_DATA + TILE_DATA_SIZE) // Address for tilemap data
 #define TILEMAP_DATA_SIZE       0x1C0U             // 448 bytes for tilemap data
 #define TILEMAP_WIDTH           28                 // Width of terrain tileset in pixels
 #define TILEMAP_HEIGHT          16                 // Height of terrain tileset in pixels
-#define WORLD_WIDTH_PX         (TILEMAP_WIDTH * TILE_SIZE)  // Total width of the world in pixels
-#define WORLD_HEIGHT_PX        (TILEMAP_HEIGHT * TILE_SIZE) // Total height of the world in pixels
+#define WORLD_WIDTH_PX         (TILEMAP_WIDTH * TILE_SIZE_X)  // Total width of the world in pixels
+#define WORLD_HEIGHT_PX        (TILEMAP_HEIGHT * TILE_SIZE_Y) // Total height of the world in pixels
 
 #define TEXT_TILES_DATA        (TILEMAP_DATA + TILEMAP_DATA_SIZE) // Address for text tile bitmap data
 #define TEXT_TILES_DATA_SIZE    0x5F80U           // 24320 bytes (191 frames 16x16 at 4bpp)
