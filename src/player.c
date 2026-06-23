@@ -502,6 +502,29 @@ void player_update_motion(void)
     xram0_struct_set(TILE_GROUND_CONFIG, vga_mode2_config_t, y_pos_px, player.world_y_px);
 }
 
+static void check_victory_ladders(void)
+{
+    uint16_t gold_left = 0;
+    RIA.addr0 = TILEMAP_DATA;
+    RIA.step0 = 1;
+    for (int i = 0; i < TILEMAP_WIDTH * TILEMAP_HEIGHT; i++) {
+        if (RIA.rw0 == MAP_TILE_GOLD) {
+            gold_left++;
+        }
+    }
+    
+    for (uint8_t i = 0; i < MAX_ENEMIES; i++) {
+        if (guards[i].active && guards[i].gold) {
+            gold_left++;
+        }
+    }
+    
+    if (gold_left == 0) {
+        reveal_hidden_ladders();
+        sound_play_hladder();
+    }
+}
+
 // Called at 23 Hz to process inputs and tick core logic
 void player_tick_logic(const input_actions_t *actions)
 {
@@ -733,26 +756,7 @@ void player_tick_logic(const input_actions_t *actions)
             update_hud();
             sound_play_gold();
             
-            // Check if there is any gold left on the map or held by guards
-            uint16_t gold_left = 0;
-            RIA.addr0 = TILEMAP_DATA;
-            RIA.step0 = 1;
-            for (int i = 0; i < TILEMAP_WIDTH * TILEMAP_HEIGHT; i++) {
-                if (RIA.rw0 == MAP_TILE_GOLD) {
-                    gold_left++;
-                }
-            }
-            
-            for (uint8_t i = 0; i < MAX_ENEMIES; i++) {
-                if (guards[i].active && guards[i].gold) {
-                    gold_left++;
-                }
-            }
-            
-            if (gold_left == 0) {
-                reveal_hidden_ladders();
-                sound_play_hladder();
-            }
+            check_victory_ladders();
         }
     }
 
@@ -1360,6 +1364,11 @@ static void ai_reborn(uint8_t guard_idx)
         }
     }
     g->goldholds = 0;
+#if STUCK_GUARD_GOLD_SAFEGUARD
+    g->stuck_x = x;
+    g->stuck_y = y;
+    g->stuck_ticks = 0;
+#endif
 }
 
 static void ai_drop_gold(uint8_t guard_idx)
@@ -1923,6 +1932,33 @@ void guards_tick_logic(void)
             }
             continue;
         }
+
+#if STUCK_GUARD_GOLD_SAFEGUARD
+        if (g->state != GSTATE_DEAD && g->state != GSTATE_REBORN && g->gold) {
+            if (g->grid_x == g->stuck_x && g->grid_y == g->stuck_y) {
+                g->stuck_ticks++;
+                if (g->stuck_ticks >= 230) { // 10 seconds at 23 Hz
+                    g->gold = false;
+                    g->goldholds = -2;
+                    g->stuck_ticks = 0;
+                    
+                    if (get_tile(g->grid_x, g->grid_y - 1) == MAP_TILE_EMPTY) {
+                        set_tile(g->grid_x, g->grid_y - 1, MAP_TILE_GOLD);
+                    } else if (get_tile(g->grid_x, g->grid_y) == MAP_TILE_EMPTY) {
+                        set_tile(g->grid_x, g->grid_y, MAP_TILE_GOLD);
+                    }
+                    
+                    check_victory_ladders();
+                }
+            } else {
+                g->stuck_x = g->grid_x;
+                g->stuck_y = g->grid_y;
+                g->stuck_ticks = 0;
+            }
+        } else {
+            g->stuck_ticks = 0;
+        }
+#endif
 
         if (!g->gold && g->goldholds == 0) {
             if (get_tile(g->grid_x, g->grid_y) == MAP_TILE_GOLD) {

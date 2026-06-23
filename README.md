@@ -13,6 +13,7 @@ An optimized port of the classic arcade platformer *Lode Runner* to the Picocomp
   - Sound effects (SFX) routed to channels 5, 6, 7, and 8 for digging, falling, guard trapping, gold acquisition, dying, and winning.
   - Active voice management preventing hanging notes during game pauses, deaths, or level loads.
 - **Intuitive Inputs**: Native gamepad support and overhauled, ergonomically comfortable keyboard controls.
+- **Quality-of-Life Safeguard (Stuck Guards)**: Automatically releases gold held by guards trapped in permanent pits. If a guard carrying gold remains stuck in the same tile for 10 seconds, they will attempt to drop the gold above them (or lose it if blocked). If the gold is lost, the level's win condition adjusts dynamically, triggering the hidden exit ladders if no other gold remains. This safeguard can be disabled via the `STUCK_GUARD_GOLD_SAFEGUARD` compiler flag in `src/constants.h`.
 
 ---
 
@@ -36,6 +37,8 @@ An optimized port of the classic arcade platformer *Lode Runner* to the Picocomp
 | **Dig Left** | `X Button` (GP_BTN_X) |
 | **Dig Right** | `A Button` (GP_BTN_A) |
 | **Pause / Start** | `Start Button` (GP_BTN_START) |
+| **Restart Level** | `Select Button` (GP_BTN_SELECT) |
+Note: Restarting a level will result in a loss of one life.
 
 ---
 

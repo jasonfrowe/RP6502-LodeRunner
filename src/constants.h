@@ -10,6 +10,11 @@
 // Frame rate configuration
 #define FPS 23
 
+// Safeguard to prevent soft-locks when a guard carrying gold is stuck in a permanent pit
+#ifndef STUCK_GUARD_GOLD_SAFEGUARD
+#define STUCK_GUARD_GOLD_SAFEGUARD 1
+#endif
+
 // Sprite data configuration
 #define SPRITE_DATA_START       0x0000U            // Starting address in XRAM for sprite data
 
