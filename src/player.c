@@ -7,6 +7,7 @@
 #include "player.h"
 #include "opl.h"
 #include "sound.h"
+#include "tile_mode_2.h"
 
 int16_t start_grid_x = 0;
 int16_t start_grid_y = 0;
@@ -588,6 +589,7 @@ void player_tick_logic(const input_actions_t *actions)
             }
             title_waiting_release = true;
         }
+        update_title_screen_aperture();
         return;
     }
 

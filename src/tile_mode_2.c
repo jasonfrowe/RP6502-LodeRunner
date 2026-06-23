@@ -10,6 +10,8 @@ unsigned TILE_GROUND_CONFIG;
 unsigned TEXT_CONFIG;
 unsigned HUD_CONFIG;
 
+static uint16_t title_aperture_timer = 0;
+
 static const uint8_t title_screen_map[216] = {
     1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 1, 1,
     1, 1, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 1, 1,
@@ -155,4 +157,67 @@ void tile_mode2_init(void)
     }
 
     update_hud();
+    title_aperture_timer = 0;
+}
+
+void update_title_screen_aperture(void)
+{
+    if (!title_screen_active) {
+        return;
+    }
+
+    title_aperture_timer++;
+    if (title_aperture_timer >= 754) {
+        title_aperture_timer = 0;
+    }
+
+    bool should_draw = false;
+    uint16_t threshold = 0;
+
+    if (title_aperture_timer >= 345 && title_aperture_timer <= 376) {
+        // Opening transition (growing transparent area)
+        should_draw = true;
+        uint16_t step = title_aperture_timer - 345;
+        threshold = step * 18;
+    }
+    else if (title_aperture_timer >= 722 && title_aperture_timer <= 753) {
+        // Closing transition (restoring title screen)
+        should_draw = true;
+        uint16_t step = title_aperture_timer - 722;
+        threshold = (31 - step) * 18;
+    }
+    else if (title_aperture_timer == 0) {
+        // Draw once to ensure full title screen is visible
+        should_draw = true;
+        threshold = 0; // all title character
+    }
+    else if (title_aperture_timer == 377) {
+        // Draw once to ensure full transparency
+        should_draw = true;
+        threshold = 600; // all zero (transparent)
+    }
+
+    if (should_draw) {
+        for (int row = 0; row < 12; row++) {
+            RIA.addr0 = TEXT_TILES_MAP_DATA + (row + 1) * TEXT_TILES_WIDTH + 1;
+            RIA.step0 = 1;
+            for (int col = 0; col < 18; col++) {
+                // Calculate distance from center (scaled by 2 to avoid float)
+                // center of 18 cols is 8.5 -> 2 * col_0_indexed - 17 ?
+                // center of 12 rows is 5.5 -> 2 * row_0_indexed - 11 ?
+                int16_t dx = 2 * col - 17;
+                int16_t dy = 2 * row - 11;
+                
+                // Aspect ratio correction: scale y-distance by 1.5 (dy * 3 / 2)
+                int16_t dy_scaled = dy * 3 / 2;
+                uint16_t dist = (uint16_t)(dx * dx + dy_scaled * dy_scaled);
+
+                if (dist < threshold) {
+                    RIA.rw0 = 0; // transparent
+                } else {
+                    RIA.rw0 = title_screen_map[row * 18 + col] + 55;
+                }
+            }
+        }
+    }
 }

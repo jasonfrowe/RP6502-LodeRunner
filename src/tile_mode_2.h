@@ -44,5 +44,6 @@ static const uint16_t texttiles_4bpp[16] = {
 };
 
 void tile_mode2_init(void);
+void update_title_screen_aperture(void);
 
 #endif // TILE_MODE2_H
