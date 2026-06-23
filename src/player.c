@@ -21,6 +21,7 @@ static bool ignore_fire = false;
 static bool ignore_bomb = false;
 static bool wait_for_input_release = true;
 static bool game_over_waiting_release = true;
+static uint16_t game_over_timer = 0;
 static uint8_t death_delay_counter = 0;
 static uint8_t victory_delay_counter = 0;
 
@@ -281,6 +282,11 @@ void player_update_motion(void)
     }
     if (!level_started) {
         sound_play_fall(false);
+        // Blink the player sprite: visible for 15 frames, hidden for 15 frames
+        int16_t x_val = ((RIA.vsync % 30) < 15) ? -32 : player.x_pos_px;
+        int16_t y_val = ((RIA.vsync % 30) < 15) ? -32 : player.y_pos_px;
+        xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, x_pos_px, x_val);
+        xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, y_pos_px, y_val);
         return;
     }
 
@@ -499,6 +505,7 @@ void player_tick_logic(const input_actions_t *actions)
             if (player_lives == 0) {
                 game_over = true;
                 game_over_waiting_release = true;
+                game_over_timer = 690; // 30 seconds at 23 Hz
                 // Display "GAME OVER" in the middle of text layer
                 RIA.addr0 = TEXT_TILES_MAP_DATA + 145;
                 RIA.step0 = 1;
@@ -528,19 +535,24 @@ void player_tick_logic(const input_actions_t *actions)
 
     // 0. Handle Title Screen state
     if (title_screen_active) {
+        static bool title_waiting_release = false;
         bool button_pressed = (actions->left || actions->right || actions->up || actions->down || 
-                               actions->fire || actions->bomb || actions->start);
-        if (button_pressed) {
+                               actions->fire || actions->bomb || actions->start || actions->land || actions->flip);
+        if (title_waiting_release) {
+            if (!button_pressed) {
+                title_screen_active = false;
+                wait_for_input_release = true;
+                title_waiting_release = false;
+                music_stop();
+            }
+        } else if (button_pressed) {
             // Clear title screen tiles (rows 1 to 12)
             RIA.addr0 = TEXT_TILES_MAP_DATA + TEXT_TILES_WIDTH; // Row 1 start
             RIA.step0 = 1;
             for (int i = 0; i < 12 * TEXT_TILES_WIDTH; i++) {
                 RIA.rw0 = 0;
             }
-            
-            title_screen_active = false;
-            wait_for_input_release = true;
-            music_stop();
+            title_waiting_release = true;
         }
         return;
     }
@@ -548,14 +560,51 @@ void player_tick_logic(const input_actions_t *actions)
     // 1. Handle Game Over state
     if (game_over) {
         bool button_pressed = (actions->left || actions->right || actions->up || actions->down || 
-                               actions->fire || actions->bomb || actions->start);
+                               actions->fire || actions->bomb || actions->start || actions->land || actions->flip);
+        static bool game_over_starting = false;
+
+        if (game_over_timer > 0) {
+            game_over_timer--;
+            if (game_over_timer == 0) {
+                // Clear "GAME OVER" text
+                RIA.addr0 = TEXT_TILES_MAP_DATA + 145;
+                RIA.step0 = 1;
+                for (int i = 0; i < 9; i++) {
+                    RIA.rw0 = 0;
+                }
+                // Return to title screen
+                title_screen_active = true;
+                game_over = false;
+                game_over_starting = false;
+                current_level = 1;
+                player_score = 0;
+                player_lives = 5;
+                load_level(1);
+                music_init("ROM:loderun");
+                return;
+            }
+        }
+
         if (game_over_waiting_release) {
             if (!button_pressed) {
                 game_over_waiting_release = false;
             }
             return;
         }
-        
+
+        if (game_over_starting) {
+            if (!button_pressed) {
+                // Start the game!
+                player_score = 0;
+                player_lives = 5;
+                current_level = 1;
+                game_over = false;
+                game_over_starting = false;
+                load_level(1);
+            }
+            return;
+        }
+
         if (button_pressed) {
             // Clear "GAME OVER" text
             RIA.addr0 = TEXT_TILES_MAP_DATA + 145;
@@ -563,12 +612,7 @@ void player_tick_logic(const input_actions_t *actions)
             for (int i = 0; i < 9; i++) {
                 RIA.rw0 = 0;
             }
-            
-            player_score = 0;
-            player_lives = 5;
-            current_level = 1;
-            game_over = false;
-            load_level(1);
+            game_over_starting = true;
         }
         return;
     }

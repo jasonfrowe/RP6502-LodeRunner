@@ -42,7 +42,7 @@ void tile_mode2_init(void)
     // Mode 2 args: MODE, OPTIONS, CONFIG, PLANE, BEGIN, END
     // OPTIONS: bit3=1 (8x8 tiles), bit[2:0]=2 (8-bit color index) => 0b1010 = 0x0A
     // Plane 0 = background fill layer (behind sprite plane 1)
-    if (xreg_vga_mode(2, 0x56A, TILE_GROUND_CONFIG, 0, 0, 224) < 0) {
+    if (xreg_vga_mode(2, 0x56A, TILE_GROUND_CONFIG, 0, 0, 0) < 0) {
         return;
     }
 
@@ -95,7 +95,7 @@ void tile_mode2_init(void)
     // Mode 2 args: MODE, OPTIONS, CONFIG, PLANE, BEGIN, END
     // OPTIONS: bit3=1 (8x8 tiles), bit[2:0]=2 (8-bit color index) => 0b1010 = 0x0A
     // Plane 0 = background fill layer (behind sprite plane 1)
-    if (xreg_vga_mode(2, 0x0A, TEXT_CONFIG, 1, 0, 0) < 0) {
+    if (xreg_vga_mode(2, 0x0A, TEXT_CONFIG, 2, 0, 0) < 0) {
         return;
     }
 
