@@ -1627,22 +1627,31 @@ void guards_update_motion(void)
             if (g->offset_y > 5) {
                 g->grid_y += 1;
                 g->offset_y -= 11;
+                ai_drop_gold(i);
             }
 
             if (g->offset_y <= 0) {
                 if (is_active_hole(g->grid_x, g->grid_y)) {
-                    g->state = (g->state == GSTATE_FALL_LEFT) ? GSTATE_TRAP_LEFT : GSTATE_TRAP_RIGHT;
-                    g->offset_x = 0;
-                    g->offset_y = 0;
-                    g->hole = true;
-                    g->holey = g->grid_y;
-                    ai_drop_gold_trapped(i);
-                    g->anim_frame = 0;
-                    g->anim_tick = 0;
-                    g->dir = DIR_NONE;
-                    player_score += 75;
-                    update_hud();
-                    sound_play_trap();
+                    if (is_guard_trapped_at(g->grid_x, g->grid_y)) {
+                        // Another guard is already trapped in this hole. Land on their head instead of double-trapping.
+                        g->grid_y -= 1;
+                        g->offset_y = 0;
+                        g->state = GSTATE_STOP;
+                        g->dir = DIR_NONE;
+                    } else {
+                        g->state = (g->state == GSTATE_FALL_LEFT) ? GSTATE_TRAP_LEFT : GSTATE_TRAP_RIGHT;
+                        g->offset_x = 0;
+                        g->offset_y = 0;
+                        g->hole = true;
+                        g->holey = g->grid_y;
+                        ai_drop_gold_trapped(i);
+                        g->anim_frame = 0;
+                        g->anim_tick = 0;
+                        g->dir = DIR_NONE;
+                        player_score += 75;
+                        update_hud();
+                        sound_play_trap();
+                    }
                 }
             }
 
@@ -1665,6 +1674,7 @@ void guards_update_motion(void)
             if (g->offset_y < -5) {
                 g->grid_y -= 1;
                 g->offset_y += 11;
+                ai_drop_gold(i);
             }
 
             if (g->offset_y <= 0) {
