@@ -1964,7 +1964,7 @@ void update_hud(void)
     d1 = score / 10;
     d0 = score % 10;
     
-    RIA.addr0 = TEXT_TILES_MAP_DATA + 280;
+    RIA.addr0 = HUD_MAP_DATA + 5;
     RIA.step0 = 1;
     RIA.rw0 = d5 + 1;
     RIA.rw0 = d4 + 1;
@@ -1980,7 +1980,7 @@ void update_hud(void)
         l1 = (lives % 100) / 10;
         l0 = lives % 10;
         
-        RIA.addr0 = TEXT_TILES_MAP_DATA + 290;
+        RIA.addr0 = HUD_MAP_DATA + 16;
         RIA.step0 = 1;
         RIA.rw0 = l2 + 1;
         RIA.rw0 = l1 + 1;
@@ -1994,7 +1994,7 @@ void update_hud(void)
         lv1 = (lvl % 100) / 10;
         lv0 = lvl % 10;
         
-        RIA.addr0 = TEXT_TILES_MAP_DATA + 297;
+        RIA.addr0 = HUD_MAP_DATA + 25;
         RIA.step0 = 1;
         RIA.rw0 = lv2 + 1;
         RIA.rw0 = lv1 + 1;

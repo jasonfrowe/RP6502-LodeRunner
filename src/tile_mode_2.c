@@ -8,6 +8,7 @@
 
 unsigned TILE_GROUND_CONFIG;
 unsigned TEXT_CONFIG;
+unsigned HUD_CONFIG;
 
 static const uint8_t title_screen_map[216] = {
     1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 1, 1,
@@ -59,7 +60,59 @@ void tile_mode2_init(void)
         RIA.rw0 = maptiles_4bpp[i] >> 8;
     }
 
-    TEXT_CONFIG = TILE_GROUND_CONFIG + sizeof(vga_mode2_config_t); // Just after tile ground config
+
+    HUD_CONFIG = TILE_GROUND_CONFIG + sizeof(vga_mode2_config_t); // Just after tile ground config
+
+    xram0_struct_set(HUD_CONFIG, vga_mode2_config_t, x_wrap, false);
+    xram0_struct_set(HUD_CONFIG, vga_mode2_config_t, y_wrap, false);
+    xram0_struct_set(HUD_CONFIG, vga_mode2_config_t, x_pos_px, 20);
+    xram0_struct_set(HUD_CONFIG, vga_mode2_config_t, y_pos_px, 210);
+    xram0_struct_set(HUD_CONFIG, vga_mode2_config_t, width_tiles,  HUD_TILES_WIDTH);
+    xram0_struct_set(HUD_CONFIG, vga_mode2_config_t, height_tiles, HUD_TILES_HEIGHT);
+    xram0_struct_set(HUD_CONFIG, vga_mode2_config_t, xram_data_ptr, HUD_MAP_DATA); // tile ID grid
+    xram0_struct_set(HUD_CONFIG, vga_mode2_config_t, xram_palette_ptr, TEXT_PALETTE_ADDR);
+    xram0_struct_set(HUD_CONFIG, vga_mode2_config_t, xram_tile_ptr, TEXT_TILES_DATA);        // tile bitmaps
+
+    RIA.addr0 = HUD_MAP_DATA;
+    RIA.step0 = 1;
+    RIA.rw0 = 29; // S
+    RIA.rw0 = 13; // C
+    RIA.rw0 = 25; // O
+    RIA.rw0 = 28; // R
+    RIA.rw0 = 15; // E
+    RIA.rw0 = 1;  // 01
+    RIA.rw0 = 1;  // 0
+    RIA.rw0 = 1;  // 0
+    RIA.rw0 = 1;  // 0
+    RIA.rw0 = 1;  // 0
+    RIA.rw0 = 1;  // 0
+    RIA.rw0 = 0;  // blank
+    RIA.rw0 = 23; // M
+    RIA.rw0 = 15; // E
+    RIA.rw0 = 24; // N
+    RIA.rw0 = 0;  // blank
+    RIA.rw0 = 1;  // 0
+    RIA.rw0 = 1;  // 0
+    RIA.rw0 = 6;  // 5
+    RIA.rw0 = 0;  // blank
+    RIA.rw0 = 22; // L
+    RIA.rw0 = 15; // E
+    RIA.rw0 = 32; // V
+    RIA.rw0 = 15; // E
+    RIA.rw0 = 22; // L
+    RIA.rw0 = 1;  // 0
+    RIA.rw0 = 1;  // 0
+    RIA.rw0 = 2;  // 1
+
+    // Mode 2 args: MODE, OPTIONS, CONFIG, PLANE, BEGIN, END
+    // OPTIONS: bit3=1 (8x8 tiles), bit[2:0]=2 (8-bit color index) => 0b1010 = 0x0A
+    // Plane 0 = background fill layer (behind sprite plane 1)
+    if (xreg_vga_mode(2, 0x56A, HUD_CONFIG, 1, 0, 0) < 0) {
+        return;
+    }
+
+
+    TEXT_CONFIG = HUD_CONFIG + sizeof(vga_mode2_config_t); // Just after HUD config
 
     xram0_struct_set(TEXT_CONFIG, vga_mode2_config_t, x_wrap, false);
     xram0_struct_set(TEXT_CONFIG, vga_mode2_config_t, y_wrap, false);
@@ -73,30 +126,9 @@ void tile_mode2_init(void)
 
     RIA.addr0 = TEXT_TILES_MAP_DATA;
     RIA.step0 = 1;
-    for (int i = 0; i < TEXT_TILES_WIDTH * (TEXT_TILES_HEIGHT -1); i++) {
+    for (int i = 0; i < TEXT_TILES_WIDTH * (TEXT_TILES_HEIGHT); i++) {
         RIA.rw0 = 0; // Start with blank text tilemap
     }
-    RIA.rw0 = 1;  // 0
-    RIA.rw0 = 1;  // 0
-    RIA.rw0 = 1;  // 0
-    RIA.rw0 = 1;  // 0
-    RIA.rw0 = 1;  // 0
-    RIA.rw0 = 1;  // 0
-    RIA.rw0 = 0;  // blank
-    RIA.rw0 = 23; // M
-    RIA.rw0 = 15; // E
-    RIA.rw0 = 24; // N
-    RIA.rw0 = 1;  // 0
-    RIA.rw0 = 1;  // 0
-    RIA.rw0 = 6;  // 5
-    RIA.rw0 = 0;  // blank
-    RIA.rw0 = 22; // L
-    RIA.rw0 = 15; // E
-    RIA.rw0 = 32; // V
-    RIA.rw0 = 1;  // 0
-    RIA.rw0 = 1;  // 0
-    RIA.rw0 = 2;  // 1
-
 
     // Mode 2 args: MODE, OPTIONS, CONFIG, PLANE, BEGIN, END
     // OPTIONS: bit3=1 (8x8 tiles), bit[2:0]=2 (8-bit color index) => 0b1010 = 0x0A
