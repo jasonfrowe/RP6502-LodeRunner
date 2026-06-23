@@ -18,7 +18,7 @@
 #define PLAYER_SPRITE_SIZE_PX   16                 // Player sprite is 16x16 pixels
 #define PLAYER_FRAME_SIZE       0x0080U            // 128 bytes per 16x16 4bpp frame
 #define PLAYER_FRAME_COUNT      40                 // 40 frames
-#define MAX_ENEMIES             3                  // Max number of enemies on screen at once
+#define MAX_ENEMIES             5                  // Max number of enemies on screen at once
 
 #define TILE_DATA              (PLAYER_DATA + PLAYER_DATA_SIZE) // Address for tile bitmap data
 #define TILE_DATA_SIZE          0x1780U            // 6016 bytes 47 x 16x16 tiles at 4bpp)

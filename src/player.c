@@ -975,11 +975,13 @@ void player_tick_logic(const input_actions_t *actions)
 #define RATING_BASE_BELLOW 200
 #define RATING_BASE_ABOVE 100
 
-static const uint8_t move_policy[4][6] = {
+static const uint8_t move_policy[MAX_ENEMIES + 1][6] = {
     {0, 0, 0, 0, 0, 0}, // 0 guards
     {0, 1, 1, 0, 1, 1}, // 1 guard
     {1, 1, 1, 1, 1, 1}, // 2 guards
-    {1, 2, 1, 1, 2, 1}  // 3 guards
+    {1, 2, 1, 1, 2, 1}, // 3 guards
+    {1, 2, 2, 1, 2, 2}, // 4 guards
+    {2, 2, 2, 2, 2, 2}  // 5 guards
 };
 
 static bool is_active_hole(int16_t x, int16_t y)

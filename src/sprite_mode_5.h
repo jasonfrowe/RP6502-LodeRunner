@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "constants.h"
 
 typedef struct player_s {
     int16_t x_pos_px;
@@ -65,7 +66,6 @@ typedef struct {
     bool active;
 } guard_t;
 
-#define MAX_ENEMIES 3
 extern guard_t guards[MAX_ENEMIES];
 
 // Palette extracted from graphics/player.png
