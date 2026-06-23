@@ -181,15 +181,7 @@ void music_stop(void) {
         close(music_fd);
         music_fd = -1;
     }
-    // Silence channels 0 and 1 used by music
-    opl_write(0xB0, 0x00);
-    opl_write(0xB1, 0x00);
-    opl_write(0x40, 0x3F); // channel 0 modulator volume to zero
-    opl_write(0x43, 0x3F); // channel 0 carrier volume to zero
-    opl_write(0x41, 0x3F); // channel 1 modulator volume to zero
-    opl_write(0x44, 0x3F); // channel 1 carrier volume to zero
-    shadow_b0[0] = 0;
-    shadow_b0[1] = 0;
+    opl_init();
 }
 
 void update_music() {

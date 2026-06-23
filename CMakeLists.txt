@@ -20,7 +20,7 @@ rp6502_asset(LodeRunner 0x12D5C images/texttiles_4bpp.bin)
 rp6502_asset(LodeRunner maps maps/maps.bin)
 
 # Music assets
-rp6502_asset(LodeRunner loderun Music/LODERUN.BIN)
+rp6502_asset(LodeRunner loderun Music/LODERUN2.BIN)
 
 rp6502_executable(LodeRunner 
     DATA file 
