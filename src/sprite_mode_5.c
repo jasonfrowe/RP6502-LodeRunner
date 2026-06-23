@@ -67,7 +67,6 @@ void load_next_level(void)
     if (player_lives < 99) {
         player_lives++;
     }
-    player_score += 1500;
 
     current_level++;
     if (current_level > 150) {

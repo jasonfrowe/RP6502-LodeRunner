@@ -534,6 +534,10 @@ void player_tick_logic(const input_actions_t *actions)
 
     if (victory_delay_counter > 0) {
         victory_delay_counter--;
+        if (victory_delay_counter >= 5) {
+            player_score += 50;
+            update_hud();
+        }
         if (victory_delay_counter == 0) {
             load_next_level();
         }
