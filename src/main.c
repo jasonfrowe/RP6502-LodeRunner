@@ -9,7 +9,7 @@
 #include "opl.h"
 #include "sound.h"
 
-static int8_t gplay_tick = 0u;
+static uint16_t gplay_tick = 0u;
 
 static bool init_video(void)
 {
@@ -34,12 +34,18 @@ static bool init_video(void)
 
 
 static uint8_t s_vsync_last = 0;
+static uint8_t s_music_vsync_last = 0;
 
-static void wait_for_vsync(void)
+static bool wait_for_vsync(void)
 {
+    uint16_t spin_guard = 0xFFFFu;
     while (RIA.vsync == s_vsync_last) {
+        if (--spin_guard == 0u) {
+            return false;
+        }
     }
     s_vsync_last = RIA.vsync;
+    return true;
 }
 
 int main(void)
@@ -57,25 +63,37 @@ int main(void)
         return 1;
     }
 
-    while (true) {
-        wait_for_vsync();
+    s_vsync_last = RIA.vsync;
+    s_music_vsync_last = s_vsync_last;
 
+    while (true) {
+        if (!wait_for_vsync()) {
+            s_vsync_last = RIA.vsync;
+        }
+
+        uint8_t now_vsync = RIA.vsync;
+        uint8_t music_ticks = (uint8_t)(now_vsync - s_music_vsync_last);
+        if (music_ticks == 0u) {
+            music_ticks = 1u;
+        }
+        s_music_vsync_last = now_vsync;
+
+        update_music_advance(music_ticks);
         input_poll(&actions);
 
         // Smoothly update movement/camera offsets at 60 Hz VSync
         player_update_motion();
         guards_update_motion();
 
-        update_music();
         sound_update();
 
         gplay_tick += FPS;
 
-        if (gplay_tick >= 60) {
+        while (gplay_tick >= 60u) {
             // Run original 23 Hz logic engine (AI, animations, input actions)
             player_tick_logic(&actions);
 
-            gplay_tick -= 60;
+            gplay_tick -= 60u;
         }
 
     }

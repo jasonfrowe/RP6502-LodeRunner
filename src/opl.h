@@ -22,6 +22,7 @@ extern void OPL_NoteOff(uint8_t channel);
 extern void opl_clear(void);
 extern void opl_write(uint8_t reg, uint8_t value);
 extern void update_music(void);
+extern void update_music_advance(uint8_t ticks);
 extern void OPL_SetVolume(uint8_t chan, uint8_t velocity);
 extern void opl_init(void);
 extern void opl_fifo_clear(void);

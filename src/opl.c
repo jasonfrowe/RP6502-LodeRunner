@@ -156,6 +156,7 @@ static bool music_paused = false;
 
 #define MUSIC_BUF_SIZE 512u
 #define MUSIC_MAX_BGM_CH 4u
+#define MUSIC_EVENTS_PER_FRAME_BUDGET 64u
 
 static bool music_is_bgm_slot(uint8_t slot_offset) {
     switch (slot_offset) {
@@ -245,16 +246,25 @@ void music_resume(void) {
     }
 }
 
-void update_music() {
+void update_music_advance(uint8_t ticks) {
     if (music_paused || music_error_state || music_fd < 0) return;
+    if (ticks == 0u) ticks = 1u;
 
-    if (music_wait_ticks > 0) {
-        music_wait_ticks--;
+    if (music_wait_ticks > ticks) {
+        music_wait_ticks -= ticks;
+    } else {
+        music_wait_ticks = 0;
     }
 
     if (music_wait_ticks == 0) {
-        while (music_wait_ticks == 0) {
-            if ((uint16_t)(music_bytes_ready - music_buf_idx) < 4u) {
+        uint16_t budget = (uint16_t)MUSIC_EVENTS_PER_FRAME_BUDGET * (uint16_t)ticks;
+        if (budget == 0u) budget = MUSIC_EVENTS_PER_FRAME_BUDGET;
+        if (budget > 255u) budget = 255u;
+
+        uint16_t events_processed = 0;
+        while (music_wait_ticks == 0 && events_processed < budget) {
+            if (music_buf_idx > music_bytes_ready ||
+                (uint16_t)(music_bytes_ready - music_buf_idx) < 4u) {
                 if (!music_refill_buffer()) {
                     return;
                 }
@@ -276,6 +286,7 @@ void update_music() {
             uint8_t d_lo = music_buffer[music_buf_idx++];
             uint8_t d_hi = music_buffer[music_buf_idx++];
             uint16_t delay = ((uint16_t)d_hi << 8) | d_lo;
+            events_processed++;
 
             if (music_just_looped &&
                 reg >= 0xB0 && reg <= 0xB8 &&
@@ -306,5 +317,14 @@ void update_music() {
                 music_wait_ticks = delay;
             }
         }
+
+        // Yield to the rest of the frame if a pathological stream keeps delay at zero.
+        if (music_wait_ticks == 0 && events_processed >= budget) {
+            music_wait_ticks = 1;
+        }
     }
+}
+
+void update_music() {
+    update_music_advance(1u);
 }
