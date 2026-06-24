@@ -1113,12 +1113,13 @@ static uint8_t ai_scan_level(uint8_t guard_idx)
     int16_t ry = player.grid_y;
     int16_t gx = g->grid_x;
     int16_t gy = g->grid_y;
+    uint8_t steps_left = TILEMAP_WIDTH;
 
     if (ry != gy) {
         return DIR_NONE;
     }
 
-    while (gx != rx) {
+    while (gx != rx && steps_left > 0u) {
         uint8_t lvl = get_tile(gx, gy);
         uint8_t nextlvl = (gy < TILEMAP_HEIGHT - 1) ? get_tile(gx, gy + 1) : MAP_TILE_SOLID;
         bool hole = is_active_hole(gx, gy + 1);
@@ -1138,6 +1139,12 @@ static uint8_t ai_scan_level(uint8_t guard_idx)
         } else {
             break;
         }
+
+        steps_left--;
+    }
+
+    if (steps_left == 0u) {
+        return DIR_NONE;
     }
 
     if (gx == rx) {
@@ -1249,8 +1256,9 @@ static uint8_t ai_scan_horizontal(int16_t x, int16_t y, bool left)
     uint8_t rating = RATING_MAX;
     int16_t startx = x;
     int16_t dx = left ? -1 : 1;
+    uint8_t steps_left = TILEMAP_WIDTH;
 
-    for (;;) {
+    while (steps_left > 0u) {
         if (left && x == 0) {
             break;
         } else if (!left && x == TILEMAP_WIDTH - 1) {
@@ -1283,6 +1291,8 @@ static uint8_t ai_scan_horizontal(int16_t x, int16_t y, bool left)
         if (!climb && !walk) {
             break;
         }
+
+        steps_left--;
     }
 
     return rating;

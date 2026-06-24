@@ -12,7 +12,7 @@
 
 // Safeguard to prevent soft-locks when a guard carrying gold is stuck in a permanent pit
 #ifndef STUCK_GUARD_GOLD_SAFEGUARD
-#define STUCK_GUARD_GOLD_SAFEGUARD 1
+#define STUCK_GUARD_GOLD_SAFEGUARD 0
 #endif
 
 // Sprite data configuration
