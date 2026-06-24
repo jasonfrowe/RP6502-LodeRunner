@@ -37,7 +37,7 @@ void reset_player_input_state(void)
     victory_delay_counter = 0;
 }
 
-#define MAX_ACTIVE_HOLES 8
+#define MAX_ACTIVE_HOLES 24
 
 typedef enum {
     HOLE_STATE_DIGGING,
