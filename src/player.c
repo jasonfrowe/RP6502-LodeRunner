@@ -588,6 +588,13 @@ void player_tick_logic(const input_actions_t *actions)
                 wait_for_input_release = true;
                 title_waiting_release = false;
                 music_stop();
+
+                // Clear title screen tiles (rows 1 to 12)
+                RIA.addr0 = TEXT_TILES_MAP_DATA + TEXT_TILES_WIDTH; // Row 1 start
+                RIA.step0 = 1;
+                for (int i = 0; i < 12 * TEXT_TILES_WIDTH; i++) {
+                    RIA.rw0 = 0;
+                }
             }
         } else if (button_pressed) {
             // Clear title screen tiles (rows 1 to 12)
