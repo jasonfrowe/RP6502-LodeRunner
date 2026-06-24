@@ -148,17 +148,60 @@ void OPL_Config(uint8_t enable, uint16_t addr) {
 static int music_fd = -1;
 static uint8_t music_buffer[512];
 static uint16_t music_buf_idx = 0;
-static uint16_t music_bytes_ready = 0; 
+static uint16_t music_bytes_ready = 0;
 static uint16_t music_wait_ticks = 0;
 static bool music_error_state = false;
 static bool music_just_looped = false;
 static bool music_paused = false;
 
+#define MUSIC_BUF_SIZE 512u
+#define MUSIC_MAX_BGM_CH 4u
+
+static bool music_is_bgm_slot(uint8_t slot_offset) {
+    switch (slot_offset) {
+        case 0x00: case 0x01: case 0x02:
+        case 0x03: case 0x04: case 0x05:
+        case 0x08: case 0x09:
+        case 0x0B: case 0x0C:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static bool music_reg_allowed(uint8_t reg) {
+    if (reg >= 0xA0 && reg <= 0xA8) return (uint8_t)(reg - 0xA0) <= MUSIC_MAX_BGM_CH;
+    if (reg >= 0xB0 && reg <= 0xB8) return (uint8_t)(reg - 0xB0) <= MUSIC_MAX_BGM_CH;
+    if (reg >= 0xC0 && reg <= 0xC8) return (uint8_t)(reg - 0xC0) <= MUSIC_MAX_BGM_CH;
+
+    if ((reg >= 0x20 && reg <= 0x35) ||
+        (reg >= 0x40 && reg <= 0x55) ||
+        (reg >= 0x60 && reg <= 0x75) ||
+        (reg >= 0x80 && reg <= 0x95) ||
+        (reg >= 0xE0 && reg <= 0xF5)) {
+        return music_is_bgm_slot(reg & 0x1F);
+    }
+
+    return true;
+}
+
+static bool music_refill_buffer(void) {
+    int res = read(music_fd, music_buffer, MUSIC_BUF_SIZE);
+    if (res < 0) {
+        music_error_state = true;
+        return false;
+    }
+    music_buf_idx = 0;
+    music_bytes_ready = (uint16_t)res;
+    return true;
+}
+
 void music_init(const char* filename) {
     if (music_fd >= 0) close(music_fd);
     music_fd = open(filename, O_RDONLY);
-    
+
     music_buf_idx = 0;
+    music_bytes_ready = 0;
     music_wait_ticks = 0;
     music_just_looped = false;
     music_paused = false;
@@ -168,14 +211,9 @@ void music_init(const char* filename) {
         return;
     }
 
-    int res = read(music_fd, music_buffer, 512);
-                
-    if (res < 0) {
-        music_error_state = true;
+    if (!music_refill_buffer()) {
         return;
     }
-
-    music_bytes_ready = res; 
 }
 
 void music_stop(void) {
@@ -183,6 +221,11 @@ void music_stop(void) {
         close(music_fd);
         music_fd = -1;
     }
+    music_buf_idx = 0;
+    music_bytes_ready = 0;
+    music_wait_ticks = 0;
+    music_just_looped = false;
+    music_error_state = false;
     music_paused = false;
     opl_init();
 }
@@ -190,8 +233,7 @@ void music_stop(void) {
 void music_pause(void) {
     if (music_fd >= 0 && !music_error_state) {
         music_paused = true;
-        // Kill hanging notes by keying off BGM channels 0, 1, 2, 3
-        for (uint8_t i = 0; i < 4; i++) {
+        for (uint8_t i = 0; i <= MUSIC_MAX_BGM_CH; i++) {
             opl_write(0xB0 + i, 0x00);
         }
     }
@@ -212,14 +254,21 @@ void update_music() {
 
     if (music_wait_ticks == 0) {
         while (music_wait_ticks == 0) {
-
-            if (music_buf_idx >= 512){
-                int res = read(music_fd, &music_buffer, 512);
-                if (res < 0) {
-                    music_error_state = true;
+            if ((uint16_t)(music_bytes_ready - music_buf_idx) < 4u) {
+                if (!music_refill_buffer()) {
                     return;
                 }
-                music_buf_idx = 0;
+                if (music_bytes_ready == 0) {
+                    if (lseek(music_fd, 0, SEEK_SET) < 0) {
+                        music_error_state = true;
+                        return;
+                    }
+                    if (!music_refill_buffer()) {
+                        return;
+                    }
+                    music_just_looped = true;
+                    continue;
+                }
             }
 
             uint8_t reg  = music_buffer[music_buf_idx++];
@@ -242,11 +291,15 @@ void update_music() {
                     music_error_state = true;
                     return;
                 }
-                music_buf_idx = music_bytes_ready; // Force immediate buffer reload
+                if (!music_refill_buffer()) {
+                    return;
+                }
                 music_just_looped = true;
                 continue;
             } else {
-                opl_write(reg, val);
+                if (music_reg_allowed(reg)) {
+                    opl_write(reg, val);
+                }
             }
 
             if (delay > 0) {
