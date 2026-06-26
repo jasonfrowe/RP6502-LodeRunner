@@ -916,7 +916,7 @@ void player_tick_logic(const input_actions_t *actions)
     if (game_over) {
         bool button_pressed = (actions->left || actions->right || actions->up || actions->down || 
                                actions->fire || actions->bomb || actions->start || actions->land || actions->flip);
-        static bool game_over_starting = false;
+        static bool game_over_returning = false;
 
         if (game_over_timer > 0) {
             game_over_timer--;
@@ -930,7 +930,7 @@ void player_tick_logic(const input_actions_t *actions)
                 // Return to title screen
                 title_screen_active = true;
                 game_over = false;
-                game_over_starting = false;
+                game_over_returning = false;
                 current_level = 1;
                 player_score = 0;
                 player_lives = trainer_starting_lives;
@@ -948,15 +948,18 @@ void player_tick_logic(const input_actions_t *actions)
             return;
         }
 
-        if (game_over_starting) {
+        if (game_over_returning) {
             if (!button_pressed) {
-                // Start the game!
+                // Return to title screen on button release.
                 player_score = 0;
                 player_lives = trainer_starting_lives;
-                current_level = trainer_starting_level;
+                current_level = 1;
+                title_screen_active = true;
                 game_over = false;
-                game_over_starting = false;
-                load_level(current_level);
+                game_over_returning = false;
+                load_level(1);
+                music_init("ROM:loderun2");
+                title_input_blocked_until_release = true;
             }
             return;
         }
@@ -968,7 +971,7 @@ void player_tick_logic(const input_actions_t *actions)
             for (int i = 0; i < 9; i++) {
                 RIA.rw0 = 0;
             }
-            game_over_starting = true;
+            game_over_returning = true;
         }
         return;
     }
