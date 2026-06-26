@@ -290,7 +290,11 @@ static void add_hole(int16_t hx, int16_t hy, bool dig_left)
 
 void clear_all_holes(void)
 {
-    for (uint8_t i = 0; i < active_holes_count; i++) {
+    if (active_holes_count > MAX_ACTIVE_HOLES) {
+        active_holes_count = MAX_ACTIVE_HOLES;
+    }
+
+    for (int i = 0; i < (int)active_holes_count; i++) {
         active_hole_t *h = &active_holes[i];
         if (h->state == HOLE_STATE_DIGGING) {
             set_tile(h->hx, h->hy - 1, h->original_top_tile);
@@ -336,7 +340,13 @@ void reveal_hidden_ladders(void)
 
 static void tick_holes(void)
 {
-    for (int i = 0; i < (int)active_holes_count; ) {
+    if (active_holes_count > MAX_ACTIVE_HOLES) {
+        active_holes_count = MAX_ACTIVE_HOLES;
+    }
+
+    uint8_t safety = 0;
+    for (int i = 0; i < (int)active_holes_count && safety < MAX_ACTIVE_HOLES; ) {
+        safety++;
         active_hole_t *h = &active_holes[i];
         
         if (h->state == HOLE_STATE_DIGGING) {
@@ -415,6 +425,12 @@ static void tick_holes(void)
                 set_tile(h->hx, h->hy, fill_tile);
                 i++;
             }
+        }
+        else {
+            // Corrupt/unknown hole state: restore a sane map tile and drop the entry.
+            set_tile(h->hx, h->hy, MAP_TILE_BRICK);
+            active_holes[i] = active_holes[active_holes_count - 1];
+            active_holes_count--;
         }
     }
 }
@@ -1479,8 +1495,9 @@ static uint8_t ai_scan_down(int16_t x, int16_t y, int16_t startx)
         return RATING_MAX;
     }
 
-    while (y < TILEMAP_HEIGHT - 1 && !tile_t_nh(x, y + 1, MAP_TILE_BRICK)
-           && !tile_t_nh(x, y + 1, MAP_TILE_SOLID)) {
+        uint8_t steps_left = TILEMAP_HEIGHT + 1;
+        while (steps_left > 0u && y < TILEMAP_HEIGHT - 1 && !tile_t_nh(x, y + 1, MAP_TILE_BRICK)
+            && !tile_t_nh(x, y + 1, MAP_TILE_SOLID)) {
 
         if (!tile_t_nh(x, y, MAP_TILE_EMPTY)) {
             if (x > 0) {
@@ -1505,6 +1522,11 @@ static uint8_t ai_scan_down(int16_t x, int16_t y, int16_t startx)
             }
         }
         y++;
+        steps_left--;
+    }
+
+    if (steps_left == 0u) {
+        return RATING_MAX;
     }
 
     int16_t dist = abs(startx - x);
@@ -1523,7 +1545,8 @@ static uint8_t ai_scan_up(int16_t x, int16_t y, int16_t startx)
         return RATING_MAX;
     }
 
-    while (y > 0 && (tile_t_nh(x, y, MAP_TILE_LADDER))) {
+    uint8_t steps_left = TILEMAP_HEIGHT + 1;
+    while (steps_left > 0u && y > 0 && (tile_t_nh(x, y, MAP_TILE_LADDER))) {
         y--;
 
         if (x > 0) {
@@ -1546,6 +1569,11 @@ static uint8_t ai_scan_up(int16_t x, int16_t y, int16_t startx)
                 }
             }
         }
+        steps_left--;
+    }
+
+    if (steps_left == 0u) {
+        return RATING_MAX;
     }
 
     int16_t dist = abs(startx - x);
@@ -1673,7 +1701,9 @@ static void ai_reborn(uint8_t guard_idx)
     int16_t y = 1;
     int16_t start_x = x;
     
-    while (get_tile(x, y) != MAP_TILE_EMPTY || get_tile(x, y + 1) == MAP_TILE_EMPTY) {
+    uint16_t reborn_scan_safety = (uint16_t)TILEMAP_WIDTH * (uint16_t)TILEMAP_HEIGHT + TILEMAP_WIDTH;
+    while (reborn_scan_safety > 0u &&
+           (get_tile(x, y) != MAP_TILE_EMPTY || get_tile(x, y + 1) == MAP_TILE_EMPTY)) {
         x = (x + 1) % TILEMAP_WIDTH;
         if (x == start_x) {
             y++;
@@ -1683,6 +1713,12 @@ static void ai_reborn(uint8_t guard_idx)
                 break;
             }
         }
+        reborn_scan_safety--;
+    }
+
+    if (reborn_scan_safety == 0u) {
+        x = g->start_grid_x;
+        y = g->start_grid_y;
     }
     
     g->grid_x = x;
@@ -2216,8 +2252,13 @@ void guards_tick_logic(void)
     }
     
     uint8_t moves = move_policy[num_active_guards][imoves];
-    
+    uint8_t guard_scan_safety = 0;
+
     while (moves > 0) {
+        if (++guard_scan_safety > (uint8_t)(MAX_ENEMIES * 8)) {
+            break;
+        }
+
         iguard++;
         if (iguard >= MAX_ENEMIES) {
             iguard = 0;
