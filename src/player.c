@@ -1124,7 +1124,8 @@ void player_tick_logic(const input_actions_t *actions)
     if (!is_falling_state && !is_digging_state) {
         // Check if we can trigger digging
         bool on_ground_or_ladder = (!is_empty_tile(get_tile(player.grid_x, player.grid_y + 1)) 
-                                    || get_tile(player.grid_x, player.grid_y) == MAP_TILE_LADDER);
+                                    || get_tile(player.grid_x, player.grid_y) == MAP_TILE_LADDER
+                                    || is_guard_trapped_at(player.grid_x, player.grid_y + 1));
 
         bool did_dig = false;
         if (on_ground_or_ladder) {
