@@ -64,7 +64,7 @@ void load_level(uint8_t lvl)
 
 void load_next_level(void)
 {
-    if (player_lives < 99) {
+    if (player_lives < 100) {
         player_lives++;
     }
 
