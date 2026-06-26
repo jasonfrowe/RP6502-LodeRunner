@@ -247,14 +247,22 @@ static void set_tile(int16_t x, int16_t y, uint8_t tile_id)
     RIA.rw0 = tile_id;
 }
 
-// Helper to check if a tile is empty/passable as space
+// Helper to check if a tile is empty/passable as space (horizontal movement)
 static bool is_empty_tile(uint8_t tile)
 {
     // Digging bottom frames (16-23 and 34-41) are solid until digging completes
     if ((tile >= 16 && tile <= 23) || (tile >= 34 && tile <= 41)) {
         return false;
     }
-    return tile == MAP_TILE_EMPTY || tile == MAP_TILE_FALSE || tile == MAP_TILE_GOLD || tile == MAP_TILE_RUNNER || tile == MAP_TILE_GUARD || (tile >= 7 && tile <= 42) || tile == MAP_TILE_HLADDER;
+    // MAP_TILE_FALSE (46) is NOT passable horizontally.
+    // Gold is passable because it is a collectible overlay in our map model.
+    return tile == MAP_TILE_EMPTY || tile == MAP_TILE_GOLD || tile == MAP_TILE_LADDER || tile == MAP_TILE_ROPE;
+}
+
+// Check if tile provides support to stand on (for falling check)
+static bool has_support_below(uint8_t tile)
+{
+    return tile == MAP_TILE_BRICK || tile == MAP_TILE_SOLID || tile == MAP_TILE_LADDER;
 }
 
 static void add_hole(int16_t hx, int16_t hy, bool dig_left)
@@ -484,7 +492,8 @@ void player_update_motion(void)
     bool is_falling_state = (player.state == RSTATE_FALL_LEFT || player.state == RSTATE_FALL_RIGHT);
 
     bool should_fall = is_falling_state || (
-        (is_empty_tile(tile_below) || tile_below == MAP_TILE_ROPE)
+        !has_support_below(tile_below)
+        && tile_below != MAP_TILE_ROPE
         && current_tile != MAP_TILE_ROPE
         && current_tile != MAP_TILE_LADDER
         && !is_guard_trapped_at(player.grid_x, player.grid_y + 1)
@@ -515,6 +524,7 @@ void player_update_motion(void)
         uint8_t check_tile = get_tile(player.grid_x, player.grid_y);
         uint8_t check_below = get_tile(player.grid_x, player.grid_y + 1);
 
+        // Catch on rope
         if (check_tile == MAP_TILE_ROPE && player.offset_y >= 0 && player.offset_y < step) {
             player.offset_y = 0;
             if (player.state == RSTATE_FALL_LEFT) {
@@ -523,7 +533,9 @@ void player_update_motion(void)
                 player.state = RSTATE_CLIMB_RIGHT;
             }
         }
-        else if (player.offset_y >= 0 && ((!is_empty_tile(check_below) && check_below != MAP_TILE_ROPE) || is_guard_trapped_at(player.grid_x, player.grid_y + 1))) {
+        // Stop falling if there's support below or a guard below
+        // Special case: FALSE tiles don't stop falling (can fall through them)
+        else if (player.offset_y >= 0 && ((has_support_below(check_below) || check_below == MAP_TILE_ROPE) || is_guard_trapped_at(player.grid_x, player.grid_y + 1))) {
             player.offset_y = 0;
             player.state = RSTATE_STOP;
         }
@@ -1079,7 +1091,7 @@ void player_tick_logic(const input_actions_t *actions)
     // 2. If center overlaps with gold, collect it
     if (get_tile(center_x, center_y) == MAP_TILE_GOLD) {
         uint8_t tile_below = get_tile(center_x, center_y + 1);
-        bool passable_below = (is_empty_tile(tile_below) || tile_below == MAP_TILE_ROPE);
+        bool passable_below = !has_support_below(tile_below) || tile_below == MAP_TILE_ROPE;
         bool can_collect = false;
 
         if (!passable_below) {
@@ -1420,7 +1432,7 @@ static bool ai_falling(uint8_t guard_idx)
     }
 
     uint8_t tile_below = get_tile(x, y + 1);
-    bool passable_below = is_empty_tile(tile_below) || tile_below == MAP_TILE_ROPE;
+    bool passable_below = !has_support_below(tile_below) || tile_below == MAP_TILE_ROPE;
 
     if (ty < 0 || (y < TILEMAP_HEIGHT - 1 && passable_below && !guard_occupied(guard_idx, x, y + 1))) {
         return true;
@@ -2002,7 +2014,8 @@ void guards_update_motion(void)
 
         bool is_falling_state = (g->state == GSTATE_FALL_LEFT || g->state == GSTATE_FALL_RIGHT);
         bool should_fall = is_falling_state || (
-            (is_empty_tile(tile_below) || tile_below == MAP_TILE_ROPE)
+            !has_support_below(tile_below)
+            && tile_below != MAP_TILE_ROPE
             && current_tile != MAP_TILE_ROPE
             && current_tile != MAP_TILE_LADDER
             && !g->hole
@@ -2059,7 +2072,7 @@ void guards_update_motion(void)
                 }
             }
 
-            bool blocked_below = (!is_empty_tile(tile_below) && tile_below != MAP_TILE_ROPE) || guard_occupied(i, g->grid_x, g->grid_y + 1);
+            bool blocked_below = (has_support_below(tile_below) || guard_occupied(i, g->grid_x, g->grid_y + 1));
             if (g->offset_y >= 0 && blocked_below) {
                 g->offset_y = 0;
                 g->state = GSTATE_STOP;
