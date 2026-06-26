@@ -640,7 +640,21 @@ void player_update_motion(void)
 
             uint8_t curr_tile = get_tile(player.grid_x, next_grid_y);
 
-            if (player.state == RSTATE_UPDOWN && next_ty < 0 && is_empty_tile(curr_tile)) {
+            // Only fall off ladder if the current tile is truly empty (EMPTY or FALSE).
+            // ROPE must NOT trigger this — runner should grab it instead.
+            bool left_ladder_into_empty = (curr_tile == MAP_TILE_EMPTY || curr_tile == MAP_TILE_FALSE);
+            if (player.state == RSTATE_UPDOWN && next_ty < 0 && left_ladder_into_empty) {
+                // First arrival at the bottom of a ladder: snap to grid centre and pause.
+                // This matches loderunner-ng where the first DOWN press near the ladder
+                // bottom does NOT cross the grid; only the second press crosses and falls.
+                // The pause lets the player switch to LEFT/RIGHT to grab an adjacent rope.
+                player.offset_y = 0;
+                player.state = RSTATE_STOP;
+                player.dir = DIR_NONE;
+            }
+            else if (player.state == RSTATE_STOP && next_ty < 0 && left_ladder_into_empty
+                     && get_tile(player.grid_x, player.grid_y) == MAP_TILE_LADDER) {
+                // Second DOWN press at the ladder bottom — cross into empty and fall.
                 player.state = RSTATE_FALL_RIGHT;
                 player.grid_y = next_grid_y;
                 player.offset_y = next_ty;
@@ -2206,7 +2220,16 @@ void guards_update_motion(void)
 
                 uint8_t curr_tile = get_tile(g->grid_x, next_grid_y);
 
-                if (g->state == GSTATE_UPDOWN && next_ty < 0 && is_empty_tile(curr_tile)) {
+                // Only fall off ladder if truly empty (EMPTY or FALSE), not ROPE.
+                bool left_ladder_into_empty = (curr_tile == MAP_TILE_EMPTY || curr_tile == MAP_TILE_FALSE);
+                if (g->state == GSTATE_UPDOWN && next_ty < 0 && left_ladder_into_empty) {
+                    // Snap to grid centre at ladder bottom before falling (two-press model).
+                    g->offset_y = 0;
+                    g->state = GSTATE_STOP;
+                    g->dir = DIR_NONE;
+                }
+                else if (g->state == GSTATE_STOP && next_ty < 0 && left_ladder_into_empty
+                         && get_tile(g->grid_x, g->grid_y) == MAP_TILE_LADDER) {
                     g->state = GSTATE_FALL_RIGHT;
                     g->grid_y = next_grid_y;
                     g->offset_y = next_ty;
