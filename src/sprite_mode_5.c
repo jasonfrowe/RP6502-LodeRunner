@@ -159,11 +159,9 @@ void sprite_mode5_players_init(void){
                     g->gold = false;
                     g->goldholds = 0;
                     g->active = true;
-#if STUCK_GUARD_GOLD_SAFEGUARD
                     g->stuck_x = col;
                     g->stuck_y = row;
                     g->stuck_ticks = 0;
-#endif
                     guard_count++;
                 }
 

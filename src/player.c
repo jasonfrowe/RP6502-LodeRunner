@@ -18,6 +18,170 @@ bool game_paused = false;
 bool game_over = false;
 uint32_t player_score = 0;
 uint8_t player_lives = 5;
+
+#define TRAINER_MENU_MAP_DATA 0x9000U
+bool trainer_menu_active = false;
+static uint8_t trainer_selected_row = 0;
+bool stuck_guard_gold_safeguard_active = false;
+uint8_t trainer_starting_lives = 5;
+uint8_t trainer_starting_level = 1;
+static bool title_input_blocked_until_release = true;
+
+static void trainer_clear_menu(void)
+{
+    RIA.addr0 = TRAINER_MENU_MAP_DATA;
+    RIA.step0 = 1;
+    for (int i = 0; i < 28 * 17; i++) {
+        RIA.rw0 = 56; // solid black background tile
+    }
+}
+
+static void trainer_draw_string(uint8_t col, uint8_t row, const char* str)
+{
+    RIA.addr0 = TRAINER_MENU_MAP_DATA + row * 28 + col;
+    RIA.step0 = 1;
+    while (*str) {
+        char c = *str++;
+        uint8_t tile_idx = 56;
+        if (c >= 'A' && c <= 'Z') {
+            tile_idx = c - 'A' + 11;
+        } else if (c >= 'a' && c <= 'z') {
+            tile_idx = c - 'a' + 11;
+        } else if (c >= '0' && c <= '9') {
+            tile_idx = c - '0' + 1;
+        } else if (c == '.') {
+            tile_idx = 37;
+        } else if (c == ' ') {
+            tile_idx = 56;
+        }
+        RIA.rw0 = tile_idx;
+    }
+}
+
+static void trainer_draw_num(uint8_t col, uint8_t row, uint16_t val, uint8_t digits)
+{
+    char buf[4] = "   ";
+    if (digits == 3) {
+        buf[0] = '0' + (val / 100);
+        buf[1] = '0' + ((val % 100) / 10);
+        buf[2] = '0' + (val % 10);
+        buf[3] = '\0';
+    } else if (digits == 2) {
+        buf[0] = '0' + (val / 10);
+        buf[1] = '0' + (val % 10);
+        buf[2] = '\0';
+    }
+    trainer_draw_string(col, row, buf);
+}
+
+static void render_trainer_menu(void)
+{
+    trainer_clear_menu();
+
+    trainer_draw_string(8, 2, "TRAINER MENU");
+
+    // Option 0: Stuck Safeguard
+    if (trainer_selected_row == 0) {
+        trainer_draw_string(3, 5, ". SAFEGUARD:");
+    } else {
+        trainer_draw_string(3, 5, "  SAFEGUARD:");
+    }
+    if (stuck_guard_gold_safeguard_active) {
+        trainer_draw_string(17, 5, "ON ");
+    } else {
+        trainer_draw_string(17, 5, "OFF");
+    }
+
+    // Option 1: Starting Lives
+    if (trainer_selected_row == 1) {
+        trainer_draw_string(3, 7, ". LIVES:");
+    } else {
+        trainer_draw_string(3, 7, "  LIVES:");
+    }
+    trainer_draw_num(17, 7, trainer_starting_lives, 2);
+
+    // Option 2: Starting Level
+    if (trainer_selected_row == 2) {
+        trainer_draw_string(3, 9, ". START LEVEL:");
+    } else {
+        trainer_draw_string(3, 9, "  START LEVEL:");
+    }
+    trainer_draw_num(17, 9, trainer_starting_level, 3);
+
+    trainer_draw_string(6, 12, "UP DOWN TO SELECT");
+    trainer_draw_string(5, 13, "LEFT RIGHT TO CHANGE");
+    trainer_draw_string(4, 15, "PRESS SELECT TO EXIT");
+}
+
+static void trainer_hide_sprites(void)
+{
+    // Hide player sprite
+    xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, x_pos_px, -32);
+    xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, y_pos_px, -32);
+
+    // Hide guard sprites
+    for (uint8_t i = 0; i < MAX_ENEMIES; i++) {
+        unsigned ptr = ENEMY_CONFIG + (i * sizeof(vga_mode5_sprite_t));
+        xram0_struct_set(ptr, vga_mode5_sprite_t, x_pos_px, -32);
+        xram0_struct_set(ptr, vga_mode5_sprite_t, y_pos_px, -32);
+    }
+}
+
+static void trainer_restore_sprites(void)
+{
+    // Restore player sprite
+    xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, x_pos_px, player.x_pos_px);
+    xram0_struct_set(PLAYER_CONFIG, vga_mode5_sprite_t, y_pos_px, player.y_pos_px);
+
+    // Restore guard sprites
+    for (uint8_t i = 0; i < MAX_ENEMIES; i++) {
+        guard_t *g = &guards[i];
+        unsigned ptr = ENEMY_CONFIG + (i * sizeof(vga_mode5_sprite_t));
+        if (g->active) {
+            xram0_struct_set(ptr, vga_mode5_sprite_t, x_pos_px, g->x_pos_px);
+            xram0_struct_set(ptr, vga_mode5_sprite_t, y_pos_px, g->y_pos_px);
+        } else {
+            xram0_struct_set(ptr, vga_mode5_sprite_t, x_pos_px, -32);
+            xram0_struct_set(ptr, vga_mode5_sprite_t, y_pos_px, -32);
+        }
+    }
+}
+
+static void trainer_open_menu(void)
+{
+    trainer_hide_sprites();
+
+    // Clear the text layer (rows 1 to 12) so it doesn't overlap the trainer menu
+    RIA.addr0 = TEXT_TILES_MAP_DATA + TEXT_TILES_WIDTH; // Row 1 start
+    RIA.step0 = 1;
+    for (int i = 0; i < 12 * TEXT_TILES_WIDTH; i++) {
+        RIA.rw0 = 0;
+    }
+
+    xram0_struct_set(HUD_CONFIG, vga_mode2_config_t, y_pos_px, 30);
+    xram0_struct_set(HUD_CONFIG, vga_mode2_config_t, width_tiles, 28);
+    xram0_struct_set(HUD_CONFIG, vga_mode2_config_t, height_tiles, 17);
+    xram0_struct_set(HUD_CONFIG, vga_mode2_config_t, xram_data_ptr, TRAINER_MENU_MAP_DATA);
+    render_trainer_menu();
+}
+
+static void trainer_close_menu(void)
+{
+    trainer_restore_sprites();
+
+    xram0_struct_set(HUD_CONFIG, vga_mode2_config_t, y_pos_px, 210);
+    xram0_struct_set(HUD_CONFIG, vga_mode2_config_t, width_tiles, 28);
+    xram0_struct_set(HUD_CONFIG, vga_mode2_config_t, height_tiles, 1);
+    xram0_struct_set(HUD_CONFIG, vga_mode2_config_t, xram_data_ptr, HUD_MAP_DATA);
+    
+    player_lives = trainer_starting_lives;
+    current_level = trainer_starting_level;
+    update_hud();
+
+    // Reset the title aperture timer to 753 so it immediately redraws the title screen text
+    reset_title_aperture();
+}
+
 static bool ignore_fire = false;
 static bool ignore_bomb = false;
 static bool wait_for_input_release = true;
@@ -579,9 +743,144 @@ void player_tick_logic(const input_actions_t *actions)
 
     // 0. Handle Title Screen state
     if (title_screen_active) {
+        static bool up_was_pressed = false;
+        static bool down_was_pressed = false;
+        static bool left_was_pressed = false;
+        static bool right_was_pressed = false;
+        static bool select_was_pressed = false;
+        static bool start_was_pressed = false;
+
+        bool up_pressed = actions->up;
+        bool down_pressed = actions->down;
+        bool left_pressed = actions->left;
+        bool right_pressed = actions->right;
+        bool select_pressed = actions->land;
+        bool start_pressed = actions->start;
+
+        bool up_triggered = up_pressed && !up_was_pressed;
+        bool down_triggered = down_pressed && !down_was_pressed;
+        bool left_triggered = left_pressed && !left_was_pressed;
+        bool right_triggered = right_pressed && !right_was_pressed;
+        bool select_triggered = select_pressed && !select_was_pressed;
+        bool start_triggered = start_pressed && !start_was_pressed;
+
+        up_was_pressed = up_pressed;
+        down_was_pressed = down_pressed;
+        left_was_pressed = left_pressed;
+        right_was_pressed = right_pressed;
+        select_was_pressed = select_pressed;
+        start_was_pressed = start_pressed;
+
+        if (title_input_blocked_until_release) {
+            bool any_pressed = (actions->left || actions->right || actions->up || actions->down || 
+                                actions->fire || actions->bomb || actions->start || actions->land || actions->flip);
+            if (!any_pressed) {
+                title_input_blocked_until_release = false;
+            }
+            update_title_screen_aperture();
+            return;
+        }
+
+        if (trainer_menu_active) {
+            if (select_triggered) {
+                // Close trainer menu and return to title screen
+                trainer_menu_active = false;
+                trainer_close_menu();
+                title_input_blocked_until_release = true;
+                return;
+            }
+
+            if (start_triggered) {
+                // Close trainer menu, exit title screen, and start the game!
+                trainer_menu_active = false;
+                trainer_close_menu();
+
+                title_screen_active = false;
+                wait_for_input_release = true;
+                music_stop();
+
+                // Clear title screen tiles (rows 1 to 12)
+                RIA.addr0 = TEXT_TILES_MAP_DATA + TEXT_TILES_WIDTH; // Row 1 start
+                RIA.step0 = 1;
+                for (int i = 0; i < 12 * TEXT_TILES_WIDTH; i++) {
+                    RIA.rw0 = 0;
+                }
+
+                current_level = trainer_starting_level;
+                player_lives = trainer_starting_lives;
+                player_score = 0;
+                load_level(current_level);
+                return;
+            }
+
+            if (up_triggered) {
+                if (trainer_selected_row > 0) {
+                    trainer_selected_row--;
+                } else {
+                    trainer_selected_row = 2;
+                }
+                render_trainer_menu();
+            }
+            else if (down_triggered) {
+                if (trainer_selected_row < 2) {
+                    trainer_selected_row++;
+                } else {
+                    trainer_selected_row = 0;
+                }
+                render_trainer_menu();
+            }
+
+            if (left_triggered) {
+                if (trainer_selected_row == 0) {
+                    stuck_guard_gold_safeguard_active = !stuck_guard_gold_safeguard_active;
+                } else if (trainer_selected_row == 1) {
+                    if (trainer_starting_lives > 1) {
+                        trainer_starting_lives--;
+                    } else {
+                        trainer_starting_lives = 99;
+                    }
+                } else if (trainer_selected_row == 2) {
+                    if (trainer_starting_level > 1) {
+                        trainer_starting_level--;
+                    } else {
+                        trainer_starting_level = 150;
+                    }
+                }
+                render_trainer_menu();
+            }
+            else if (right_triggered) {
+                if (trainer_selected_row == 0) {
+                    stuck_guard_gold_safeguard_active = !stuck_guard_gold_safeguard_active;
+                } else if (trainer_selected_row == 1) {
+                    if (trainer_starting_lives < 99) {
+                        trainer_starting_lives++;
+                    } else {
+                        trainer_starting_lives = 1;
+                    }
+                } else if (trainer_selected_row == 2) {
+                    if (trainer_starting_level < 150) {
+                        trainer_starting_level++;
+                    } else {
+                        trainer_starting_level = 1;
+                    }
+                }
+                render_trainer_menu();
+            }
+
+            return;
+        }
+
         static bool title_waiting_release = false;
+
+        // If SELECT (land) is pressed, open the trainer menu!
+        if (select_triggered) {
+            trainer_menu_active = true;
+            trainer_open_menu();
+            return;
+        }
+
         bool button_pressed = (actions->left || actions->right || actions->up || actions->down || 
-                               actions->fire || actions->bomb || actions->start || actions->land || actions->flip);
+                               actions->fire || actions->bomb || actions->start || actions->flip);
         if (title_waiting_release) {
             if (!button_pressed) {
                 title_screen_active = false;
@@ -595,6 +894,11 @@ void player_tick_logic(const input_actions_t *actions)
                 for (int i = 0; i < 12 * TEXT_TILES_WIDTH; i++) {
                     RIA.rw0 = 0;
                 }
+
+                current_level = trainer_starting_level;
+                player_lives = trainer_starting_lives;
+                player_score = 0;
+                load_level(current_level);
             }
         } else if (button_pressed) {
             // Clear title screen tiles (rows 1 to 12)
@@ -630,9 +934,10 @@ void player_tick_logic(const input_actions_t *actions)
                 game_over_starting = false;
                 current_level = 1;
                 player_score = 0;
-                player_lives = 5;
+                player_lives = trainer_starting_lives;
                 load_level(1);
                 music_init("ROM:loderun2");
+                title_input_blocked_until_release = true;
                 return;
             }
         }
@@ -648,11 +953,11 @@ void player_tick_logic(const input_actions_t *actions)
             if (!button_pressed) {
                 // Start the game!
                 player_score = 0;
-                player_lives = 5;
-                current_level = 1;
+                player_lives = trainer_starting_lives;
+                current_level = trainer_starting_level;
                 game_over = false;
                 game_over_starting = false;
-                load_level(1);
+                load_level(current_level);
             }
             return;
         }
@@ -707,7 +1012,7 @@ void player_tick_logic(const input_actions_t *actions)
     // 3. Handle waiting for input release after respawn/load
     if (wait_for_input_release) {
         bool button_pressed = (actions->left || actions->right || actions->up || actions->down || 
-                               actions->fire || actions->bomb || actions->land);
+                               actions->fire || actions->bomb || actions->land || actions->start || actions->flip);
         if (!button_pressed) {
             wait_for_input_release = false;
         }
@@ -1396,11 +1701,9 @@ static void ai_reborn(uint8_t guard_idx)
         }
     }
     g->goldholds = 0;
-#if STUCK_GUARD_GOLD_SAFEGUARD
     g->stuck_x = x;
     g->stuck_y = y;
     g->stuck_ticks = 0;
-#endif
 }
 
 static void ai_drop_gold(uint8_t guard_idx)
@@ -1965,8 +2268,7 @@ void guards_tick_logic(void)
             continue;
         }
 
-#if STUCK_GUARD_GOLD_SAFEGUARD
-        if (g->state != GSTATE_DEAD && g->state != GSTATE_REBORN && g->gold) {
+        if (stuck_guard_gold_safeguard_active && g->state != GSTATE_DEAD && g->state != GSTATE_REBORN && g->gold) {
             if (g->grid_x == g->stuck_x && g->grid_y == g->stuck_y) {
                 g->stuck_ticks++;
                 if (g->stuck_ticks >= 230) { // 10 seconds at 23 Hz
@@ -1984,7 +2286,6 @@ void guards_tick_logic(void)
         } else {
             g->stuck_ticks = 0;
         }
-#endif
 
         if (!g->gold && g->goldholds == 0) {
             if (get_tile(g->grid_x, g->grid_y) == MAP_TILE_GOLD) {

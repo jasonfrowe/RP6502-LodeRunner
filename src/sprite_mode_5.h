@@ -64,11 +64,9 @@ typedef struct {
     bool gold;
     int16_t goldholds;
     bool active;
-#if STUCK_GUARD_GOLD_SAFEGUARD
     int16_t stuck_x;
     int16_t stuck_y;
     uint16_t stuck_ticks;
-#endif
 } guard_t;
 
 extern guard_t guards[MAX_ENEMIES];

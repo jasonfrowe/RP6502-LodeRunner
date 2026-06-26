@@ -160,6 +160,11 @@ void tile_mode2_init(void)
     title_aperture_timer = 0;
 }
 
+void reset_title_aperture(void)
+{
+    title_aperture_timer = 753;
+}
+
 void update_title_screen_aperture(void)
 {
     if (!title_screen_active) {
