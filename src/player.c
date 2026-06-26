@@ -25,7 +25,6 @@ bool stuck_guard_gold_safeguard_active = false;
 uint8_t trainer_starting_lives = 5;
 uint8_t trainer_starting_level = 1;
 static bool title_input_blocked_until_release = true;
-static bool ladder_bottom_pause_armed = false;
 
 static void trainer_clear_menu(void)
 {
@@ -225,7 +224,6 @@ static void ai_kill(uint8_t guard_idx);
 static bool check_runner_guard_collision(void);
 static bool is_guard_trapped_at(int16_t x, int16_t y);
 static bool guard_occupied(uint8_t me_idx, int16_t x, int16_t y);
-static bool is_hole_fully_formed(int16_t x, int16_t y);
 
 // Reads tile ID from the tilemap stored in XRAM at grid position (x, y)
 static uint8_t get_tile(int16_t x, int16_t y)
@@ -249,60 +247,14 @@ static void set_tile(int16_t x, int16_t y, uint8_t tile_id)
     RIA.rw0 = tile_id;
 }
 
-// Helper to check if a tile is empty/passable as space (horizontal movement)
+// Helper to check if a tile is empty/passable as space
 static bool is_empty_tile(uint8_t tile)
 {
     // Digging bottom frames (16-23 and 34-41) are solid until digging completes
     if ((tile >= 16 && tile <= 23) || (tile >= 34 && tile <= 41)) {
         return false;
     }
-    // In this port, hole/dig/fill animation tiles live in the map tile range.
-    // Keep them passable (except bottom dig frames handled above), but keep
-    // MAP_TILE_FALSE (46) blocked for horizontal movement.
-    return tile == MAP_TILE_EMPTY
-        || tile == MAP_TILE_GOLD
-        || tile == MAP_TILE_RUNNER
-        || tile == MAP_TILE_GUARD
-        || (tile >= 7 && tile <= 42)
-        || tile == MAP_TILE_HLADDER
-        || tile == MAP_TILE_LADDER
-        || tile == MAP_TILE_ROPE;
-}
-
-// Check if tile provides support to stand on (for falling check)
-static bool has_support_below(uint8_t tile)
-{
-    return tile == MAP_TILE_BRICK || tile == MAP_TILE_SOLID || tile == MAP_TILE_LADDER;
-}
-
-// A tile is open for vertical falling only when it is truly empty space,
-// a false tile, rope, or a fully formed hole. Intermediate dig frames are
-// not considered open yet.
-static bool is_open_for_fall(int16_t x, int16_t y, uint8_t tile)
-{
-    if (tile == MAP_TILE_EMPTY || tile == MAP_TILE_FALSE || tile == MAP_TILE_ROPE) {
-        return true;
-    }
-
-    return is_hole_fully_formed(x, y);
-}
-
-// Check whether the tile above a dig target is clear for digging.
-// Matches loderunner-ng intent (empty space only), while allowing this port's
-// transient passable dig animation tiles so chained pit-digging still works.
-static bool is_dig_top_clear(uint8_t tile)
-{
-    if (tile == MAP_TILE_EMPTY) {
-        return true;
-    }
-
-    // Passable dig/fill animation frames in this port's tilemap encoding.
-    if ((tile >= 7 && tile <= 42)
-        && !((tile >= 16 && tile <= 23) || (tile >= 34 && tile <= 41))) {
-        return true;
-    }
-
-    return false;
+    return tile == MAP_TILE_EMPTY || tile == MAP_TILE_FALSE || tile == MAP_TILE_GOLD || tile == MAP_TILE_RUNNER || tile == MAP_TILE_GUARD || (tile >= 7 && tile <= 42) || tile == MAP_TILE_HLADDER;
 }
 
 static void add_hole(int16_t hx, int16_t hy, bool dig_left)
@@ -490,6 +442,9 @@ static bool can_move_to(int16_t x, int16_t y)
         return false;
     }
     uint8_t tile = get_tile(x, y);
+    if (tile == MAP_TILE_FALSE) {
+        return false;
+    }
     return is_empty_tile(tile) || tile == MAP_TILE_LADDER || tile == MAP_TILE_ROPE;
 }
 
@@ -532,15 +487,11 @@ void player_update_motion(void)
     bool is_falling_state = (player.state == RSTATE_FALL_LEFT || player.state == RSTATE_FALL_RIGHT);
 
     bool should_fall = is_falling_state || (
-        is_open_for_fall(player.grid_x, player.grid_y + 1, tile_below)
+        (is_empty_tile(tile_below) || tile_below == MAP_TILE_ROPE)
         && current_tile != MAP_TILE_ROPE
         && current_tile != MAP_TILE_LADDER
         && !is_guard_trapped_at(player.grid_x, player.grid_y + 1)
     );
-
-    if (player.dir != DIR_DOWN) {
-        ladder_bottom_pause_armed = false;
-    }
 
     if (should_fall) {
         if (!is_falling_state) {
@@ -567,7 +518,6 @@ void player_update_motion(void)
         uint8_t check_tile = get_tile(player.grid_x, player.grid_y);
         uint8_t check_below = get_tile(player.grid_x, player.grid_y + 1);
 
-        // Catch on rope
         if (check_tile == MAP_TILE_ROPE && player.offset_y >= 0 && player.offset_y < step) {
             player.offset_y = 0;
             if (player.state == RSTATE_FALL_LEFT) {
@@ -576,11 +526,7 @@ void player_update_motion(void)
                 player.state = RSTATE_CLIMB_RIGHT;
             }
         }
-        // Stop falling if there's support below or a guard below
-        // Special case: FALSE tiles don't stop falling (can fall through them)
-        else if (player.offset_y >= 0
-                 && ((!is_open_for_fall(player.grid_x, player.grid_y + 1, check_below))
-                     || is_guard_trapped_at(player.grid_x, player.grid_y + 1))) {
+        else if (player.offset_y >= 0 && ((!is_empty_tile(check_below) && check_below != MAP_TILE_ROPE) || is_guard_trapped_at(player.grid_x, player.grid_y + 1))) {
             player.offset_y = 0;
             player.state = RSTATE_STOP;
         }
@@ -678,31 +624,13 @@ void player_update_motion(void)
 
             uint8_t curr_tile = get_tile(player.grid_x, next_grid_y);
 
-            // Only fall off ladder if the current tile is truly empty (EMPTY or FALSE).
-            // ROPE must NOT trigger this — runner should grab it instead.
-            bool left_ladder_into_empty = (curr_tile == MAP_TILE_EMPTY || curr_tile == MAP_TILE_FALSE);
-            if (player.state == RSTATE_UPDOWN && next_ty < 0 && left_ladder_into_empty && !ladder_bottom_pause_armed) {
-                // First arrival at the bottom of a ladder: snap to grid centre and pause.
-                // This matches loderunner-ng where the first DOWN press near the ladder
-                // bottom does NOT cross the grid; only the second press crosses and falls.
-                // The pause lets the player switch to LEFT/RIGHT to grab an adjacent rope.
-                player.offset_y = 0;
-                player.state = RSTATE_STOP;
-                player.dir = DIR_NONE;
-                ladder_bottom_pause_armed = true;
-            }
-            else if ((player.state == RSTATE_STOP || player.state == RSTATE_UPDOWN)
-                     && next_ty < 0 && left_ladder_into_empty
-                     && get_tile(player.grid_x, player.grid_y) == MAP_TILE_LADDER
-                     && ladder_bottom_pause_armed) {
-                // Second DOWN press at the ladder bottom — cross into empty and fall.
+            if (player.state == RSTATE_UPDOWN && next_ty < 0 && is_empty_tile(curr_tile)) {
                 player.state = RSTATE_FALL_RIGHT;
                 player.grid_y = next_grid_y;
                 player.offset_y = next_ty;
                 player.offset_x = 0;
-                ladder_bottom_pause_armed = false;
             }
-            else if (next_ty > 0 && !can_move_to(player.grid_x, next_grid_y + 1)) {
+            else if (next_ty > 0 && !can_move_to(player.grid_x, next_grid_y + 1) && get_tile(player.grid_x, next_grid_y + 1) != MAP_TILE_FALSE) {
                 player.offset_y = 0;
                 player.state = RSTATE_STOP;
             }
@@ -1154,7 +1082,7 @@ void player_tick_logic(const input_actions_t *actions)
     // 2. If center overlaps with gold, collect it
     if (get_tile(center_x, center_y) == MAP_TILE_GOLD) {
         uint8_t tile_below = get_tile(center_x, center_y + 1);
-        bool passable_below = !has_support_below(tile_below) || tile_below == MAP_TILE_ROPE;
+        bool passable_below = (is_empty_tile(tile_below) || tile_below == MAP_TILE_ROPE);
         bool can_collect = false;
 
         if (!passable_below) {
@@ -1194,37 +1122,19 @@ void player_tick_logic(const input_actions_t *actions)
     bool is_digging_state = (player.state == RSTATE_DIG_LEFT || player.state == RSTATE_DIG_RIGHT);
 
     if (!is_falling_state && !is_digging_state) {
-        bool did_dig = false;
-        if (actions->fire) { // Dig Left
-            if (!ignore_fire) {
-                if (get_tile(player.grid_x - 1, player.grid_y + 1) == MAP_TILE_BRICK &&
-                    is_dig_top_clear(get_tile(player.grid_x - 1, player.grid_y)) &&
-                    !guard_occupied(0xFF, player.grid_x - 1, player.grid_y)) {
-                    
-                    add_hole(player.grid_x - 1, player.grid_y + 1, true);
-                    player.state = RSTATE_DIG_LEFT;
-                    player.offset_x = 0;
-                    player.offset_y = 0;
-                    player.anim_frame = 0;
-                    player.anim_tick = 0;
-                    player.dir = DIR_NONE;
-                    did_dig = true;
-                    sound_play_dig();
-                }
-            }
-        } else {
-            ignore_fire = false;
-        }
+        // Check if we can trigger digging
+        bool on_ground_or_ladder = (!is_empty_tile(get_tile(player.grid_x, player.grid_y + 1)) 
+                                    || get_tile(player.grid_x, player.grid_y) == MAP_TILE_LADDER);
 
-        if (!did_dig) {
-            if (actions->bomb) { // Dig Right
-                if (!ignore_bomb) {
-                    if (get_tile(player.grid_x + 1, player.grid_y + 1) == MAP_TILE_BRICK &&
-                        is_dig_top_clear(get_tile(player.grid_x + 1, player.grid_y)) &&
-                        !guard_occupied(0xFF, player.grid_x + 1, player.grid_y)) {
+        bool did_dig = false;
+        if (on_ground_or_ladder) {
+            if (actions->fire) { // Dig Left
+                if (!ignore_fire) {
+                    if (get_tile(player.grid_x - 1, player.grid_y + 1) == MAP_TILE_BRICK &&
+                        is_empty_tile(get_tile(player.grid_x - 1, player.grid_y))) {
                         
-                        add_hole(player.grid_x + 1, player.grid_y + 1, false);
-                        player.state = RSTATE_DIG_RIGHT;
+                        add_hole(player.grid_x - 1, player.grid_y + 1, true);
+                        player.state = RSTATE_DIG_LEFT;
                         player.offset_x = 0;
                         player.offset_y = 0;
                         player.anim_frame = 0;
@@ -1235,7 +1145,29 @@ void player_tick_logic(const input_actions_t *actions)
                     }
                 }
             } else {
-                ignore_bomb = false;
+                ignore_fire = false;
+            }
+
+            if (!did_dig) {
+                if (actions->bomb) { // Dig Right
+                    if (!ignore_bomb) {
+                        if (get_tile(player.grid_x + 1, player.grid_y + 1) == MAP_TILE_BRICK &&
+                            is_empty_tile(get_tile(player.grid_x + 1, player.grid_y))) {
+                            
+                            add_hole(player.grid_x + 1, player.grid_y + 1, false);
+                            player.state = RSTATE_DIG_RIGHT;
+                            player.offset_x = 0;
+                            player.offset_y = 0;
+                            player.anim_frame = 0;
+                            player.anim_tick = 0;
+                            player.dir = DIR_NONE;
+                            did_dig = true;
+                            sound_play_dig();
+                        }
+                    }
+                } else {
+                    ignore_bomb = false;
+                }
             }
         }
 
@@ -1491,7 +1423,7 @@ static bool ai_falling(uint8_t guard_idx)
     }
 
     uint8_t tile_below = get_tile(x, y + 1);
-    bool passable_below = is_open_for_fall(x, y + 1, tile_below);
+    bool passable_below = is_empty_tile(tile_below) || tile_below == MAP_TILE_ROPE;
 
     if (ty < 0 || (y < TILEMAP_HEIGHT - 1 && passable_below && !guard_occupied(guard_idx, x, y + 1))) {
         return true;
@@ -1515,6 +1447,9 @@ static uint8_t ai_scan_level(uint8_t guard_idx)
 
     while (gx != rx && steps_left > 0u) {
         uint8_t lvl = get_tile(gx, gy);
+        if (gx != g->grid_x && lvl == MAP_TILE_FALSE) {
+            break;
+        }
         uint8_t nextlvl = (gy < TILEMAP_HEIGHT - 1) ? get_tile(gx, gy + 1) : MAP_TILE_SOLID;
         bool hole = is_active_hole(gx, gy + 1);
         bool gd = guard_occupied(guard_idx, gx, gy + 1);
@@ -1671,7 +1606,7 @@ static uint8_t ai_scan_horizontal(int16_t x, int16_t y, bool left)
             break;
         }
 
-        if (get_tile(x + dx, y) == MAP_TILE_BRICK || get_tile(x + dx, y) == MAP_TILE_SOLID) {
+        if (get_tile(x + dx, y) == MAP_TILE_BRICK || get_tile(x + dx, y) == MAP_TILE_SOLID || get_tile(x + dx, y) == MAP_TILE_FALSE) {
             break;
         }
 
@@ -2073,7 +2008,7 @@ void guards_update_motion(void)
 
         bool is_falling_state = (g->state == GSTATE_FALL_LEFT || g->state == GSTATE_FALL_RIGHT);
         bool should_fall = is_falling_state || (
-            is_open_for_fall(g->grid_x, g->grid_y + 1, tile_below)
+            (is_empty_tile(tile_below) || tile_below == MAP_TILE_ROPE)
             && current_tile != MAP_TILE_ROPE
             && current_tile != MAP_TILE_LADDER
             && !g->hole
@@ -2130,8 +2065,7 @@ void guards_update_motion(void)
                 }
             }
 
-            bool blocked_below = (!is_open_for_fall(g->grid_x, g->grid_y + 1, tile_below)
-                                  || guard_occupied(i, g->grid_x, g->grid_y + 1));
+            bool blocked_below = (!is_empty_tile(tile_below) && tile_below != MAP_TILE_ROPE) || guard_occupied(i, g->grid_x, g->grid_y + 1);
             if (g->offset_y >= 0 && blocked_below) {
                 g->offset_y = 0;
                 g->state = GSTATE_STOP;
@@ -2263,23 +2197,14 @@ void guards_update_motion(void)
 
                 uint8_t curr_tile = get_tile(g->grid_x, next_grid_y);
 
-                // Only fall off ladder if truly empty (EMPTY or FALSE), not ROPE.
-                bool left_ladder_into_empty = (curr_tile == MAP_TILE_EMPTY || curr_tile == MAP_TILE_FALSE);
-                if (g->state == GSTATE_UPDOWN && next_ty < 0 && left_ladder_into_empty) {
-                    // Snap to grid centre at ladder bottom before falling (two-press model).
-                    g->offset_y = 0;
-                    g->state = GSTATE_STOP;
-                    g->dir = DIR_NONE;
-                }
-                else if (g->state == GSTATE_STOP && next_ty < 0 && left_ladder_into_empty
-                         && get_tile(g->grid_x, g->grid_y) == MAP_TILE_LADDER) {
+                if (g->state == GSTATE_UPDOWN && next_ty < 0 && is_empty_tile(curr_tile)) {
                     g->state = GSTATE_FALL_RIGHT;
                     g->grid_y = next_grid_y;
                     g->offset_y = next_ty;
                     g->offset_x = 0;
                     g->dir = DIR_FALL;
                 }
-                else if (next_ty > 0 && (!can_move_to(g->grid_x, next_grid_y + 1) || guard_occupied(i, g->grid_x, next_grid_y + 1))) {
+                else if (next_ty > 0 && (guard_occupied(i, g->grid_x, next_grid_y + 1) || (!can_move_to(g->grid_x, next_grid_y + 1) && get_tile(g->grid_x, next_grid_y + 1) != MAP_TILE_FALSE))) {
                     g->offset_y = 0;
                     g->state = GSTATE_STOP;
                     g->dir = DIR_NONE;
