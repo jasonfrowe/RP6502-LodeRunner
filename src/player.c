@@ -254,9 +254,17 @@ static bool is_empty_tile(uint8_t tile)
     if ((tile >= 16 && tile <= 23) || (tile >= 34 && tile <= 41)) {
         return false;
     }
-    // MAP_TILE_FALSE (46) is NOT passable horizontally.
-    // Gold is passable because it is a collectible overlay in our map model.
-    return tile == MAP_TILE_EMPTY || tile == MAP_TILE_GOLD || tile == MAP_TILE_LADDER || tile == MAP_TILE_ROPE;
+    // In this port, hole/dig/fill animation tiles live in the map tile range.
+    // Keep them passable (except bottom dig frames handled above), but keep
+    // MAP_TILE_FALSE (46) blocked for horizontal movement.
+    return tile == MAP_TILE_EMPTY
+        || tile == MAP_TILE_GOLD
+        || tile == MAP_TILE_RUNNER
+        || tile == MAP_TILE_GUARD
+        || (tile >= 7 && tile <= 42)
+        || tile == MAP_TILE_HLADDER
+        || tile == MAP_TILE_LADDER
+        || tile == MAP_TILE_ROPE;
 }
 
 // Check if tile provides support to stand on (for falling check)
@@ -492,8 +500,7 @@ void player_update_motion(void)
     bool is_falling_state = (player.state == RSTATE_FALL_LEFT || player.state == RSTATE_FALL_RIGHT);
 
     bool should_fall = is_falling_state || (
-        !has_support_below(tile_below)
-        && tile_below != MAP_TILE_ROPE
+        (!has_support_below(tile_below) || tile_below == MAP_TILE_ROPE)
         && current_tile != MAP_TILE_ROPE
         && current_tile != MAP_TILE_LADDER
         && !is_guard_trapped_at(player.grid_x, player.grid_y + 1)
@@ -535,7 +542,7 @@ void player_update_motion(void)
         }
         // Stop falling if there's support below or a guard below
         // Special case: FALSE tiles don't stop falling (can fall through them)
-        else if (player.offset_y >= 0 && ((has_support_below(check_below) || check_below == MAP_TILE_ROPE) || is_guard_trapped_at(player.grid_x, player.grid_y + 1))) {
+        else if (player.offset_y >= 0 && (has_support_below(check_below) || is_guard_trapped_at(player.grid_x, player.grid_y + 1))) {
             player.offset_y = 0;
             player.state = RSTATE_STOP;
         }
@@ -1131,19 +1138,37 @@ void player_tick_logic(const input_actions_t *actions)
     bool is_digging_state = (player.state == RSTATE_DIG_LEFT || player.state == RSTATE_DIG_RIGHT);
 
     if (!is_falling_state && !is_digging_state) {
-        // Check if we can trigger digging
-        bool on_ground_or_ladder = (!is_empty_tile(get_tile(player.grid_x, player.grid_y + 1)) 
-                                    || get_tile(player.grid_x, player.grid_y) == MAP_TILE_LADDER);
-
         bool did_dig = false;
-        if (on_ground_or_ladder) {
-            if (actions->fire) { // Dig Left
-                if (!ignore_fire) {
-                    if (get_tile(player.grid_x - 1, player.grid_y + 1) == MAP_TILE_BRICK &&
-                        is_empty_tile(get_tile(player.grid_x - 1, player.grid_y))) {
+        if (actions->fire) { // Dig Left
+            if (!ignore_fire) {
+                if (get_tile(player.grid_x - 1, player.grid_y + 1) == MAP_TILE_BRICK &&
+                    get_tile(player.grid_x - 1, player.grid_y) == MAP_TILE_EMPTY &&
+                    !guard_occupied(0xFF, player.grid_x - 1, player.grid_y)) {
+                    
+                    add_hole(player.grid_x - 1, player.grid_y + 1, true);
+                    player.state = RSTATE_DIG_LEFT;
+                    player.offset_x = 0;
+                    player.offset_y = 0;
+                    player.anim_frame = 0;
+                    player.anim_tick = 0;
+                    player.dir = DIR_NONE;
+                    did_dig = true;
+                    sound_play_dig();
+                }
+            }
+        } else {
+            ignore_fire = false;
+        }
+
+        if (!did_dig) {
+            if (actions->bomb) { // Dig Right
+                if (!ignore_bomb) {
+                    if (get_tile(player.grid_x + 1, player.grid_y + 1) == MAP_TILE_BRICK &&
+                        get_tile(player.grid_x + 1, player.grid_y) == MAP_TILE_EMPTY &&
+                        !guard_occupied(0xFF, player.grid_x + 1, player.grid_y)) {
                         
-                        add_hole(player.grid_x - 1, player.grid_y + 1, true);
-                        player.state = RSTATE_DIG_LEFT;
+                        add_hole(player.grid_x + 1, player.grid_y + 1, false);
+                        player.state = RSTATE_DIG_RIGHT;
                         player.offset_x = 0;
                         player.offset_y = 0;
                         player.anim_frame = 0;
@@ -1154,29 +1179,7 @@ void player_tick_logic(const input_actions_t *actions)
                     }
                 }
             } else {
-                ignore_fire = false;
-            }
-
-            if (!did_dig) {
-                if (actions->bomb) { // Dig Right
-                    if (!ignore_bomb) {
-                        if (get_tile(player.grid_x + 1, player.grid_y + 1) == MAP_TILE_BRICK &&
-                            is_empty_tile(get_tile(player.grid_x + 1, player.grid_y))) {
-                            
-                            add_hole(player.grid_x + 1, player.grid_y + 1, false);
-                            player.state = RSTATE_DIG_RIGHT;
-                            player.offset_x = 0;
-                            player.offset_y = 0;
-                            player.anim_frame = 0;
-                            player.anim_tick = 0;
-                            player.dir = DIR_NONE;
-                            did_dig = true;
-                            sound_play_dig();
-                        }
-                    }
-                } else {
-                    ignore_bomb = false;
-                }
+                ignore_bomb = false;
             }
         }
 
@@ -2014,8 +2017,7 @@ void guards_update_motion(void)
 
         bool is_falling_state = (g->state == GSTATE_FALL_LEFT || g->state == GSTATE_FALL_RIGHT);
         bool should_fall = is_falling_state || (
-            !has_support_below(tile_below)
-            && tile_below != MAP_TILE_ROPE
+            (!has_support_below(tile_below) || tile_below == MAP_TILE_ROPE)
             && current_tile != MAP_TILE_ROPE
             && current_tile != MAP_TILE_LADDER
             && !g->hole
