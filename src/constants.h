@@ -46,7 +46,10 @@
 #define HUD_TILES_WIDTH          28                // 28 tiles per row for HUD layer
 #define HUD_TILES_HEIGHT         1                 // 1 tile per column for HUD layer
 
-#define SPRITE_DATA_END        (HUD_MAP_DATA + HUD_MAP_DATA_SIZE) // End address for sprite data
+#define TRAINER_MENU_MAP_DATA   (HUD_MAP_DATA + HUD_MAP_DATA_SIZE) // Address for trainer menu tilemap data
+#define TRAINER_MENU_MAP_DATA_SIZE 0x1DCU          // 476 bytes for trainer menu tilemap
+
+#define SPRITE_DATA_END        (TRAINER_MENU_MAP_DATA + TRAINER_MENU_MAP_DATA_SIZE) // End address for sprite data
 
 // Palette configurations
 #define PLAYER_PALETTE_ADDR      0xFC00  // 16-color palette (32 bytes, 0xFC00-0xFC1F)

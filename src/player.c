@@ -19,7 +19,6 @@ bool game_over = false;
 uint32_t player_score = 0;
 uint8_t player_lives = 5;
 
-#define TRAINER_MENU_MAP_DATA 0x9000U
 bool trainer_menu_active = false;
 static uint8_t trainer_selected_row = 0;
 bool stuck_guard_gold_safeguard_active = false;
@@ -2313,6 +2312,21 @@ void guards_tick_logic(void)
 
 void update_hud(void)
 {
+    if (title_screen_active) {
+        static const uint8_t title_hud[28] = {
+            29, 30, 11, 28, 30, 44, 0,      // "START: "
+            26, 22, 11, 35, 0, 0,          // "PLAY  "
+            29, 15, 22, 15, 13, 30, 44, 0,  // "SELECT: "
+            25, 26, 30, 19, 25, 24, 29      // "OPTIONS"
+        };
+        RIA.addr0 = HUD_MAP_DATA;
+        RIA.step0 = 1;
+        for (int i = 0; i < 28; i++) {
+            RIA.rw0 = title_hud[i];
+        }
+        return;
+    }
+
     uint32_t score = player_score;
     uint8_t d6, d5, d4, d3, d2, d1, d0;
     
